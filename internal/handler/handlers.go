@@ -12,8 +12,7 @@ func GetUrlHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	id := req.PathValue("id")
-	url:="https://practicum.yandex.ru/"
-	res.Header().Set("location",url)
+	res.Header().Set("location",id)
 	res.WriteHeader(http.StatusTemporaryRedirect)
 	res.Write([]byte(id))
 }
