@@ -7,13 +7,15 @@ import (
 	"io"
 	"net/http"
 )
-//Сгенерировано ии
+
 func generateID() (string, error) {
+	//Сгенерировано ии*
 	b := make([]byte, 6)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
 	return base64.URLEncoding.EncodeToString(b)[:8], nil
+	//Сгенерировано ии*
 }
 
 func GetUrlHandler(urls *map[string]string) http.HandlerFunc {
