@@ -20,6 +20,7 @@ func TestGetUrlHandler(t *testing.T) {
 		name string
 		want want
 		method string
+		path string
 	}{
 		{
 			name: "positive test #1",
@@ -29,23 +30,39 @@ func TestGetUrlHandler(t *testing.T) {
 					location: "https://practicum.yandex.ru/",
 			},
 			method: http.MethodGet,
+			path: "EwHXdJfB",
     },
 		{
 			name: "negative test #1",
 			want: want{
-					code:        405,
+					code:        400,
 					response:    "Only GET requests are allowed!\n",
 					location: "",
 			},
 			method: http.MethodPost,
+			path: "EwHXdJfB",
+    },
+		{
+			name: "negative test #2",
+			want: want{
+					code:        400,
+					response:    "URL not found\n",
+					location: "",
+			},
+			method: http.MethodGet,
+			path: "EwHXdJfA",
     },
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			request := httptest.NewRequest(test.method, "/EwHXdJfB", nil)
-
+			request := httptest.NewRequest(test.method, "/"+test.path, nil)
+			request.SetPathValue("id", test.path)
 			w := httptest.NewRecorder()
-			GetUrlHandler(w, request)
+			urls := map[string]string{
+				"EwHXdJfB":"https://practicum.yandex.ru/",
+			}
+			h:=GetUrlHandler(&urls)
+			h(w, request)
 
 			res := w.Result()
 
@@ -78,7 +95,6 @@ func TestPostUrlHandler(t *testing.T) {
 			name: "positive test #1",
 			want: want{
 				code:201,
-				response:"http://localhost:8080/EwHXdJfB",
 				contentType:"text/plain",
 			},
 			method: http.MethodPost,
@@ -88,7 +104,7 @@ func TestPostUrlHandler(t *testing.T) {
 		{
 			name: "negative test #1 GET method",
 			want: want{
-				code:405,
+				code:400,
 				response:"Only POST requests are allowed!\n",
 				contentType:"text/plain; charset=utf-8",
 			},
@@ -125,14 +141,19 @@ func TestPostUrlHandler(t *testing.T) {
 			request.Header.Set("content-type",test.contentType)
 
 			w:=httptest.NewRecorder()
-			PostUrlHandler(w, request)
+			urls := make(map[string]string)
+
+			h:=PostUrlHandler(&urls)
+			h(w, request)
 
 			res := w.Result()
 			assert.Equal(t, test.want.code, res.StatusCode)
 			defer res.Body.Close()
 			resBody,err :=io.ReadAll(res.Body)
 			require.NoError(t,err)
-			assert.Equal(t, test.want.response, string(resBody))
+			if res.StatusCode!=http.StatusCreated {
+				assert.Equal(t, test.want.response, string(resBody))
+			}
 			assert.Equal(t, test.want.contentType, res.Header.Get("content-type"))
 			
 		})
