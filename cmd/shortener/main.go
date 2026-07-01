@@ -4,15 +4,16 @@ import (
 	"net/http"
 
 	"github.com/KiberIGOR/tinyurl/internal/handler"
+	"github.com/go-chi/chi/v5"
 )
 
 func main() {
 	urls := make(map[string]string)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", handler.PostUrlHandler(&urls))
-	mux.HandleFunc("/{id}", handler.GetUrlHandler(&urls))
-	err := http.ListenAndServe(":8080", mux)
+	r := chi.NewRouter()
+	r.Post("/", handler.PostUrlHandler(&urls))
+	r.Get("/{id}", handler.GetUrlHandler(&urls))
+	err := http.ListenAndServe(":8080", r)
 	if err != nil {
 		panic(err)
 	}
