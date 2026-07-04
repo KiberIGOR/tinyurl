@@ -35,7 +35,7 @@ func GetUrlHandler(urls *map[string]string) http.HandlerFunc {
 	}
 }
 
-func PostUrlHandler(urls *map[string]string) http.HandlerFunc {
+func PostUrlHandler(urls *map[string]string,redirect string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost {
 			http.Error(res, "Only POST requests are allowed!", http.StatusBadRequest)
@@ -61,7 +61,7 @@ func PostUrlHandler(urls *map[string]string) http.HandlerFunc {
 			return
 		}
 		(*urls)[id] = string(body)
-		shortURL := fmt.Sprintf("http://localhost:8080/%s", id)
+		shortURL := fmt.Sprintf("%s%s",redirect, id)
 		res.Header().Set("content-type", "text/plain")
 		res.Header().Set("content-length", fmt.Sprintf("%d", len(shortURL)))
 		res.WriteHeader(http.StatusCreated)

@@ -10,10 +10,12 @@ import (
 func main() {
 	urls := make(map[string]string)
 
+	parseFlags()
+
 	r := chi.NewRouter()
-	r.Post("/", handler.PostUrlHandler(&urls))
+	r.Post("/", handler.PostUrlHandler(&urls,flagRedirectAddr))
 	r.Get("/{id}", handler.GetUrlHandler(&urls))
-	err := http.ListenAndServe(":8080", r)
+	err := http.ListenAndServe(flagRunAddr, r)
 	if err != nil {
 		panic(err)
 	}
