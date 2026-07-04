@@ -142,7 +142,7 @@ func TestPostUrlHandler(t *testing.T) {
 
 			w:=httptest.NewRecorder()
 			urls := make(map[string]string)
-			redirect := "http://localhost:8080/"
+			redirect := "http://localhost:8080"
 
 			h:=PostUrlHandler(&urls, redirect)
 			h(w, request)

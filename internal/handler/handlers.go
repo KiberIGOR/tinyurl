@@ -61,7 +61,7 @@ func PostUrlHandler(urls *map[string]string,redirect string) http.HandlerFunc {
 			return
 		}
 		(*urls)[id] = string(body)
-		shortURL := fmt.Sprintf("%s%s",redirect, id)
+		shortURL := fmt.Sprintf("%s/%s",redirect, id)
 		res.Header().Set("content-type", "text/plain")
 		res.Header().Set("content-length", fmt.Sprintf("%d", len(shortURL)))
 		res.WriteHeader(http.StatusCreated)
