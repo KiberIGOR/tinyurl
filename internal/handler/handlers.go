@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sync"
 )
 
@@ -60,7 +61,11 @@ func PostUrlHandler(urls map[string]string,redirect string) http.HandlerFunc {
 		mu.Lock()
 		urls[id] = string(body)
 		mu.Unlock()
-		shortURL := fmt.Sprintf("%s/%s",redirect, id)
+		shortURL, err := url.JoinPath(redirect,id)
+		if err != nil {
+			http.Error(res, "can't join path", http.StatusInternalServerError)
+			return
+		}
 		res.Header().Set("content-type", "text/plain")
 		res.Header().Set("content-length", fmt.Sprintf("%d", len(shortURL)))
 		res.WriteHeader(http.StatusCreated)
