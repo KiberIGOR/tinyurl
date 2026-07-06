@@ -69,6 +69,8 @@ func TestGetUrlHandler(t *testing.T) {
 
 
 func TestPostUrlHandler(t *testing.T) {
+	const redirect = "http://localhost:8080/"
+
 	type want struct {
 		code int
 		response string
@@ -84,8 +86,9 @@ func TestPostUrlHandler(t *testing.T) {
 		{
 			name: "positive test #1",
 			want: want{
-				code:201,
-				contentType:"text/plain",
+				code:        201,
+				response:    redirect,
+				contentType: "text/plain",
 			},
 			method: http.MethodPost,
 			contentType: "text/plain",
@@ -121,7 +124,6 @@ func TestPostUrlHandler(t *testing.T) {
 
 			w:=httptest.NewRecorder()
 			urls := make(map[string]string)
-			redirect := "http://localhost:8080/"
 
 			h:=PostUrlHandler(urls, redirect)
 			h(w, request)
@@ -131,11 +133,18 @@ func TestPostUrlHandler(t *testing.T) {
 			defer res.Body.Close()
 			resBody,err :=io.ReadAll(res.Body)
 			require.NoError(t,err)
-			if res.StatusCode!=http.StatusCreated {
-				assert.Equal(t, test.want.response, string(resBody))
+			body:=string(resBody)
+			if test.want.code == http.StatusCreated {
+				assert.True(t, strings.HasPrefix(body, test.want.response),
+					"response body should start with %q, got %q", test.want.response, body)
+				id := strings.TrimPrefix(body, test.want.response)
+				assert.NotEmpty(t, id)
+				assert.Equal(t, test.data, urls[id])
+			} else {
+				assert.Equal(t, test.want.response, body)
 			}
+
 			assert.Equal(t, test.want.contentType, res.Header.Get("content-type"))
-			
 		})
 	}
 }
