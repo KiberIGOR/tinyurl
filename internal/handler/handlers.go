@@ -23,10 +23,6 @@ func generateID() (string, error) {
 
 func GetUrlHandler(urls map[string]string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		if req.Method != http.MethodGet {
-			http.Error(res, "Only GET requests are allowed!", http.StatusBadRequest)
-			return
-		}
 		id := req.PathValue("id")
 		mu.Lock()
 		url, ok := urls[id]
@@ -42,10 +38,6 @@ func GetUrlHandler(urls map[string]string) http.HandlerFunc {
 
 func PostUrlHandler(urls map[string]string,redirect string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		if req.Method != http.MethodPost {
-			http.Error(res, "Only POST requests are allowed!", http.StatusBadRequest)
-			return
-		}
 		content := req.Header.Get("content-type")
 		if content != "text/plain" && content != "text/plain;charset=UTF-8" {
 			http.Error(res, "Only content-type: text/plain are allowed!", http.StatusBadRequest)

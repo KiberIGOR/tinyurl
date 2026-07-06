@@ -33,16 +33,6 @@ func TestGetUrlHandler(t *testing.T) {
 			path: "EwHXdJfB",
     },
 		{
-			name: "negative test #1",
-			want: want{
-					code:        400,
-					response:    "Only GET requests are allowed!\n",
-					location: "",
-			},
-			method: http.MethodPost,
-			path: "EwHXdJfB",
-    },
-		{
 			name: "negative test #2",
 			want: want{
 					code:        400,
@@ -98,17 +88,6 @@ func TestPostUrlHandler(t *testing.T) {
 				contentType:"text/plain",
 			},
 			method: http.MethodPost,
-			contentType: "text/plain",
-			data: "https://practicum.yandex.ru/",
-		},
-		{
-			name: "negative test #1 GET method",
-			want: want{
-				code:400,
-				response:"Only POST requests are allowed!\n",
-				contentType:"text/plain; charset=utf-8",
-			},
-			method: http.MethodGet,
 			contentType: "text/plain",
 			data: "https://practicum.yandex.ru/",
 		},
