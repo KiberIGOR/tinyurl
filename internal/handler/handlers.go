@@ -6,6 +6,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
+)
+
+var ( 
+	mu sync.Mutex
 )
 
 func generateID() (string, error) {
@@ -25,7 +30,9 @@ func GetUrlHandler(urls *map[string]string) http.HandlerFunc {
 			return
 		}
 		id := req.PathValue("id")
+		mu.Lock()
 		url, ok := (*urls)[id]
+		mu.Unlock()
 		if !ok {
 			http.Error(res, "URL not found", http.StatusBadRequest)
 			return
@@ -60,7 +67,9 @@ func PostUrlHandler(urls *map[string]string,redirect string) http.HandlerFunc {
 			http.Error(res, "can't generate id", http.StatusInternalServerError)
 			return
 		}
+		mu.Lock()
 		(*urls)[id] = string(body)
+		mu.Unlock()
 		shortURL := fmt.Sprintf("%s/%s",redirect, id)
 		res.Header().Set("content-type", "text/plain")
 		res.Header().Set("content-length", fmt.Sprintf("%d", len(shortURL)))
