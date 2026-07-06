@@ -61,14 +61,14 @@ func PostUrlHandler(urls map[string]string,redirect string) http.HandlerFunc {
 				http.Error(res, "can't generate id", http.StatusInternalServerError)
 				return
 			}
-			_, exists := urls[id]
-			if !exists {
-				break
-			}
+			mu.Lock()
+    	if _, exists := urls[id]; !exists {
+        urls[id] = string(body)
+        mu.Unlock()
+        break
+    	}
+    	mu.Unlock()
 		}
-		mu.Lock()
-		urls[id] = string(body)
-		mu.Unlock()
 		shortURL, err := url.JoinPath(redirect,id)
 		if err != nil {
 			http.Error(res, "can't join path", http.StatusInternalServerError)
