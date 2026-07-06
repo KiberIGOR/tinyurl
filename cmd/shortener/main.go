@@ -6,6 +6,7 @@ import (
 	"github.com/KiberIGOR/tinyurl/internal/config"
 	"github.com/KiberIGOR/tinyurl/internal/handler"
 	"github.com/go-chi/chi/v5"
+	"log"
 )
 
 func main() {
@@ -18,6 +19,6 @@ func main() {
 	r.Get("/{id}", handler.GetUrlHandler(&urls))
 	err := http.ListenAndServe(cfg.Address, r)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }
