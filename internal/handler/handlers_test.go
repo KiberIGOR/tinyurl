@@ -61,7 +61,7 @@ func TestGetUrlHandler(t *testing.T) {
 			urls := map[string]string{
 				"EwHXdJfB":"https://practicum.yandex.ru/",
 			}
-			h:=GetUrlHandler(&urls)
+			h:=GetUrlHandler(urls)
 			h(w, request)
 
 			res := w.Result()
@@ -144,7 +144,7 @@ func TestPostUrlHandler(t *testing.T) {
 			urls := make(map[string]string)
 			redirect := "http://localhost:8080"
 
-			h:=PostUrlHandler(&urls, redirect)
+			h:=PostUrlHandler(urls, redirect)
 			h(w, request)
 
 			res := w.Result()

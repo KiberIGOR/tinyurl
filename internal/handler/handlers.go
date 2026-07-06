@@ -21,7 +21,7 @@ func generateID() (string, error) {
 	return base64.URLEncoding.EncodeToString(b)[:8], nil
 }
 
-func GetUrlHandler(urls *map[string]string) http.HandlerFunc {
+func GetUrlHandler(urls map[string]string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodGet {
 			http.Error(res, "Only GET requests are allowed!", http.StatusBadRequest)
@@ -29,7 +29,7 @@ func GetUrlHandler(urls *map[string]string) http.HandlerFunc {
 		}
 		id := req.PathValue("id")
 		mu.Lock()
-		url, ok := (*urls)[id]
+		url, ok := urls[id]
 		mu.Unlock()
 		if !ok {
 			http.Error(res, "URL not found", http.StatusBadRequest)
@@ -40,7 +40,7 @@ func GetUrlHandler(urls *map[string]string) http.HandlerFunc {
 	}
 }
 
-func PostUrlHandler(urls *map[string]string,redirect string) http.HandlerFunc {
+func PostUrlHandler(urls map[string]string,redirect string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost {
 			http.Error(res, "Only POST requests are allowed!", http.StatusBadRequest)
@@ -66,7 +66,7 @@ func PostUrlHandler(urls *map[string]string,redirect string) http.HandlerFunc {
 			return
 		}
 		mu.Lock()
-		(*urls)[id] = string(body)
+		urls[id] = string(body)
 		mu.Unlock()
 		shortURL := fmt.Sprintf("%s/%s",redirect, id)
 		res.Header().Set("content-type", "text/plain")

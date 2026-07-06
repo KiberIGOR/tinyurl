@@ -15,8 +15,8 @@ func main() {
 	urls := make(map[string]string)
 
 	r := chi.NewRouter()
-	r.Post("/", handler.PostUrlHandler(&urls, cfg.BaseURL))
-	r.Get("/{id}", handler.GetUrlHandler(&urls))
+	r.Post("/", handler.PostUrlHandler(urls, cfg.BaseURL))
+	r.Get("/{id}", handler.GetUrlHandler(urls))
 	err := http.ListenAndServe(cfg.Address, r)
 	if err != nil {
 		log.Fatal(err)
