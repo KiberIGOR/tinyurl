@@ -54,21 +54,21 @@ func PostUrlHandler(urls map[string]string,redirect string) http.HandlerFunc {
 			return
 		}
 		//решение коллизии
+		var id string
 		for {
-			id, err := generateID()
+			id, err = generateID()
 			if err != nil {
 				http.Error(res, "can't generate id", http.StatusInternalServerError)
 				return
 			}
 			_, exists := urls[id]
 			if !exists {
-				mu.Lock()
-				urls[id] = string(body)
-				mu.Unlock()
 				break
 			}
 		}
-
+		mu.Lock()
+		urls[id] = string(body)
+		mu.Unlock()
 		shortURL, err := url.JoinPath(redirect,id)
 		if err != nil {
 			http.Error(res, "can't join path", http.StatusInternalServerError)
