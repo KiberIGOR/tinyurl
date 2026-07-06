@@ -53,14 +53,22 @@ func PostUrlHandler(urls map[string]string,redirect string) http.HandlerFunc {
 			http.Error(res, "URL is required", http.StatusBadRequest)
 			return
 		}
-		id, err := generateID()
-		if err != nil {
-			http.Error(res, "can't generate id", http.StatusInternalServerError)
-			return
+		//решение коллизии
+		for {
+			id, err := generateID()
+			if err != nil {
+				http.Error(res, "can't generate id", http.StatusInternalServerError)
+				return
+			}
+			_, exists := urls[id]
+			if !exists {
+				mu.Lock()
+				urls[id] = string(body)
+				mu.Unlock()
+				break
+			}
 		}
-		mu.Lock()
-		urls[id] = string(body)
-		mu.Unlock()
+
 		shortURL, err := url.JoinPath(redirect,id)
 		if err != nil {
 			http.Error(res, "can't join path", http.StatusInternalServerError)
