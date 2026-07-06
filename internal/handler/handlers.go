@@ -69,6 +69,10 @@ func PostUrlHandler(urls map[string]string,redirect string) http.HandlerFunc {
 		res.Header().Set("content-type", "text/plain")
 		res.Header().Set("content-length", fmt.Sprintf("%d", len(shortURL)))
 		res.WriteHeader(http.StatusCreated)
-		res.Write([]byte(shortURL))
+		_,err = res.Write([]byte(shortURL))
+		if err != nil {
+			http.Error(res, "can't write body", http.StatusInternalServerError)
+			return
+		}
 	}
 }
