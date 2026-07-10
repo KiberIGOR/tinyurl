@@ -4,7 +4,9 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/url"
+
 	"github.com/KiberIGOR/tinyurl/internal/repository"
 )
 
@@ -40,7 +42,7 @@ func (s *Shortener) Shorten(originalURL string) (string, error) {
 			if errors.Is(err,repository.ErrAlreadyExist) {
 				continue
 			}
-			return "", err
+			return "", fmt.Errorf("failed to store the URL: %w", err)
 		}
 		return url.JoinPath(s.baseURL, id)
 	}
