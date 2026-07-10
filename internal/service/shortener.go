@@ -11,7 +11,7 @@ import (
 )
 
 var ErrNotFound = errors.New("URL not found")
-var ErrCollision = errors.New("Not found correct id for URL(collision)")
+var ErrCollision = errors.New("not found correct id for URL(collision)")
 
 type URLRepository interface {
 	Get(id string) (string, bool)
