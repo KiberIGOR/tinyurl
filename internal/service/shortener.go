@@ -5,13 +5,15 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/url"
+	"github.com/KiberIGOR/tinyurl/internal/repository"
 )
 
 var ErrNotFound = errors.New("URL not found")
+var ErrCollision = errors.New("Not found correct id for URL(collision)")
 
 type URLRepository interface {
 	Get(id string) (string, bool)
-	Save(id, originalURL string)
+	Save(id, originalURL string) error
 }
 
 type Shortener struct {
@@ -27,17 +29,22 @@ func NewShortener(repo URLRepository, baseURL string) *Shortener {
 }
 
 func (s *Shortener) Shorten(originalURL string) (string, error) {
-	for {
+	const n int = 5
+	for i:=0; i<n; i++ {
 		id, err := generateID()
 		if err != nil {
 			return "", err
 		}
-		if _, exists := s.repo.Get(id); exists {
-			continue
+		err = s.repo.Save(id, originalURL)
+		if err !=nil {
+			if errors.Is(err,repository.ErrAlreadyExist) {
+				continue
+			}
+			return "", err
 		}
-		s.repo.Save(id, originalURL)
 		return url.JoinPath(s.baseURL, id)
 	}
+	return "", ErrCollision
 }
 
 func (s *Shortener) Resolve(id string) (string, error) {

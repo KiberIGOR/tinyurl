@@ -54,7 +54,7 @@ func (h *Handler) PostUrlHandler(res http.ResponseWriter, req *http.Request) {
 	}
 	shortURL, err := h.shortener.Shorten(string(body))
 	if err != nil {
-		http.Error(res, "can't generate id", http.StatusInternalServerError)
+		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	res.Header().Set("content-type", "text/plain")

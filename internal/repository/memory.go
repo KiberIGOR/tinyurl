@@ -1,7 +1,11 @@
 package repository
 
-import "sync"
+import (
+	"errors"
+	"sync"
+)
 
+var ErrAlreadyExist = errors.New("URL already exist")
 type Memory struct {
 	mu   sync.RWMutex
 	urls map[string]string
@@ -20,8 +24,12 @@ func (m *Memory) Get(id string) (string, bool) {
 	return url, ok
 }
 
-func (m *Memory) Save(id, originalURL string) {
+func (m *Memory) Save(id, originalURL string) error {
+	if _,ok := m.Get(id); ok {
+		return ErrAlreadyExist
+	}
 	m.mu.Lock()
 	m.urls[id] = originalURL
 	m.mu.Unlock()
+	return nil
 }
