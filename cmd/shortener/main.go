@@ -5,6 +5,8 @@ import (
 
 	"github.com/KiberIGOR/tinyurl/internal/config"
 	"github.com/KiberIGOR/tinyurl/internal/handler"
+	"github.com/KiberIGOR/tinyurl/internal/repository"
+	"github.com/KiberIGOR/tinyurl/internal/service"
 	"github.com/go-chi/chi/v5"
 	"log"
 )
@@ -12,11 +14,13 @@ import (
 func main() {
 	cfg := config.Parse()
 
-	urls := make(map[string]string)
+	store := repository.NewMemory()
+	svc := service.NewShortener(store, cfg.BaseURL)
+	h := handler.New(svc)
 
 	r := chi.NewRouter()
-	r.Post("/", handler.PostUrlHandler(urls, cfg.BaseURL))
-	r.Get("/{id}", handler.GetUrlHandler(urls))
+	r.Post("/", h.PostUrlHandler)
+	r.Get("/{id}", h.GetURL)
 	err := http.ListenAndServe(cfg.Address, r)
 	if err != nil {
 		log.Fatal(err)

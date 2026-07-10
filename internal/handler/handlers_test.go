@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/KiberIGOR/tinyurl/internal/repository"
+	"github.com/KiberIGOR/tinyurl/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,14 +47,14 @@ func TestGetUrlHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			store := repository.NewMemory()
+			store.Save("EwHXdJfB", "https://practicum.yandex.ru/")
+			h := New(service.NewShortener(store, "http://localhost:8080/"))
+
 			request := httptest.NewRequest(test.method, "/"+test.path, nil)
 			request.SetPathValue("id", test.path)
 			w := httptest.NewRecorder()
-			urls := map[string]string{
-				"EwHXdJfB":"https://practicum.yandex.ru/",
-			}
-			h:=GetUrlHandler(urls)
-			h(w, request)
+			h.GetURL(w, request)
 
 			res := w.Result()
 
@@ -123,10 +125,9 @@ func TestPostUrlHandler(t *testing.T) {
 			request.Header.Set("content-type",test.contentType)
 
 			w:=httptest.NewRecorder()
-			urls := make(map[string]string)
-
-			h:=PostUrlHandler(urls, redirect)
-			h(w, request)
+			store := repository.NewMemory()
+			h := New(service.NewShortener(store, redirect))
+			h.PostUrlHandler(w, request)
 
 			res := w.Result()
 			assert.Equal(t, test.want.code, res.StatusCode)
@@ -139,7 +140,9 @@ func TestPostUrlHandler(t *testing.T) {
 					"response body should start with %q, got %q", test.want.response, body)
 				id := strings.TrimPrefix(body, test.want.response)
 				assert.NotEmpty(t, id)
-				assert.Equal(t, test.data, urls[id])
+				originalURL, ok := store.Get(id)
+				assert.True(t, ok)
+				assert.Equal(t, test.data, originalURL)
 			} else {
 				assert.Equal(t, test.want.response, body)
 			}
