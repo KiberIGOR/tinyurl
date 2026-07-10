@@ -2,9 +2,9 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/KiberIGOR/tinyurl/internal/service"
 )
@@ -58,9 +58,9 @@ func (h *Handler) PostUrlHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	res.Header().Set("content-type", "text/plain")
-	res.Header().Set("content-length", fmt.Sprintf("%d", len(shortURL)))
+	res.Header().Set("content-length", strconv.Itoa(len(shortURL)))
 	res.WriteHeader(http.StatusCreated)
 	if _, err = res.Write([]byte(shortURL)); err != nil {
-		http.Error(res, "can't write body", http.StatusInternalServerError)
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }
