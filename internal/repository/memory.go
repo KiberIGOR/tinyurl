@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 )
 
@@ -19,17 +20,22 @@ func NewMemory() *Memory {
 
 func (m *Memory) Get(id string) (string, bool) {
 	m.mu.Lock()
+	defer m.mu.Unlock()
 	url, ok := m.urls[id]
-	m.mu.Unlock()
 	return url, ok
 }
 
 func (m *Memory) Save(id, originalURL string) error {
-	if _,ok := m.Get(id); ok {
-		return ErrAlreadyExist
-	}
 	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.get(id); ok {
+		return fmt.Errorf("%w: %q", ErrAlreadyExist, id)
+	}
 	m.urls[id] = originalURL
-	m.mu.Unlock()
 	return nil
+}
+
+func (m *Memory) get(id string) (string, bool)  {
+	originalURL, ok := m.urls[id]
+	return originalURL, ok
 }
