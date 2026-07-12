@@ -21,7 +21,7 @@ func NewMemory() *Memory {
 func (m *Memory) Get(id string) (string, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	url, ok := m.urls[id]
+	url, ok := m.get(id)
 	return url, ok
 }
 
