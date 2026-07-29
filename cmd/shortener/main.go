@@ -21,7 +21,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	store := repository.NewMemory()
+	store,err := repository.NewMemory(cfg.FileStoragePath)
+	if err != nil {
+		log.Fatal(err)
+	}
 	svc := service.NewShortener(store, cfg.BaseURL)
 	h := handler.New(svc)
 
@@ -29,7 +32,7 @@ func main() {
 	r.Post("/", logger.RequestLogger(compress.GzipMiddleware(h.PostUrlHandler)))
 	r.Post("/api/shorten", logger.RequestLogger(compress.GzipMiddleware(h.PostJsonUrlHandler)))
 	r.Get("/{id}",logger.RequestLogger(compress.GzipMiddleware(h.GetURL)))
-	err := http.ListenAndServe(cfg.Address, r)
+	err = http.ListenAndServe(cfg.Address, r)
 	if err != nil {
 		log.Fatal(err)
 	}

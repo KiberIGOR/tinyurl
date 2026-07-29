@@ -49,7 +49,8 @@ func TestGetUrlHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			store := repository.NewMemory()
+			store, err := repository.NewMemory("fileMemoryTest.txt")
+			require.NoError(t, err)
 			store.Save("EwHXdJfB", "https://practicum.yandex.ru/")
 			h := New(service.NewShortener(store, "http://localhost:8080/"))
 
@@ -127,7 +128,8 @@ func TestPostUrlHandler(t *testing.T) {
 			request.Header.Set("content-type",test.contentType)
 
 			w:=httptest.NewRecorder()
-			store := repository.NewMemory()
+			store, err:= repository.NewMemory("fileMemoryTest.txt")
+			require.NoError(t, err)
 			h := New(service.NewShortener(store, redirect))
 			h.PostUrlHandler(w, request)
 
@@ -220,7 +222,8 @@ func TestPostJsonUrlHandler(t *testing.T) {
 			request.Header.Set("content-type",test.contentType)
 
 			w:=httptest.NewRecorder()
-			store := repository.NewMemory()
+			store,err := repository.NewMemory("fileMemoryTest.txt")
+			require.NoError(t, err)
 			h := New(service.NewShortener(store, redirect))
 			h.PostJsonUrlHandler(w, request)
 
