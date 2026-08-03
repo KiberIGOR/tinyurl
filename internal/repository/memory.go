@@ -16,6 +16,7 @@ var ErrAlreadyExist = errors.New("URL already exist")
 var ErrOpenFile = errors.New("Error while seving memory in file")
 var ErrMakingJson = errors.New("Error while making JSON")
 var ErrParsingJson = errors.New("Error while parsing JSON")
+var ErrWritingJson = errors.New("Error while writing JSON")
 type Memory struct {
 	mu   sync.RWMutex
 	urls map[string]string
@@ -94,6 +95,9 @@ func (m *Memory) Save(id, originalURL string) error {
   }
 
 	err = os.WriteFile(m.fileName, writebyte, 0666)
+	if err != nil {
+        return fmt.Errorf("%w: %w", ErrWritingJson, err)
+  }
 	m.urls[id] = originalURL
 	return nil
 }
