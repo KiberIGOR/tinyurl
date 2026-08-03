@@ -29,9 +29,12 @@ func main() {
 	h := handler.New(svc)
 
 	r := chi.NewRouter()
-	r.Post("/", logger.RequestLogger(compress.GzipMiddleware(h.PostUrlHandler)))
-	r.Post("/api/shorten", logger.RequestLogger(compress.GzipMiddleware(h.PostJsonUrlHandler)))
-	r.Get("/{id}",logger.RequestLogger(compress.GzipMiddleware(h.GetURL)))
+	r.Use(logger.RequestLogger)
+	r.Use(compress.GzipMiddleware)
+	
+	r.Post("/", h.PostUrlHandler)
+	r.Post("/api/shorten", h.PostJsonUrlHandler)
+	r.Get("/{id}", h.GetURL)
 	err = http.ListenAndServe(cfg.Address, r)
 	if err != nil {
 		log.Fatal(err)

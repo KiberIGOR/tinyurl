@@ -52,8 +52,8 @@ func(r *loggingResponceWriter) WriteHeader(code int) {
 }
 
 // RequestLogger — middleware-логер для входящих HTTP-запросов.
-func RequestLogger(h http.HandlerFunc) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
+func RequestLogger(h http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         start := time.Now()
         data := &responceData{
             status:0,
@@ -77,5 +77,5 @@ func RequestLogger(h http.HandlerFunc) http.HandlerFunc {
             zap.Int("status", data.status),
             zap.Int("size", data.size),
         )
-    }
+    })
 } 
