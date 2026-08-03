@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/KiberIGOR/tinyurl/internal/model"
 	"github.com/KiberIGOR/tinyurl/internal/repository"
 	"github.com/KiberIGOR/tinyurl/internal/service"
 	"github.com/stretchr/testify/assert"
@@ -47,7 +49,8 @@ func TestGetUrlHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			store := repository.NewMemory()
+			store, err := repository.NewMemory("fileMemoryTest.txt")
+			require.NoError(t, err)
 			store.Save("EwHXdJfB", "https://practicum.yandex.ru/")
 			h := New(service.NewShortener(store, "http://localhost:8080/"))
 
@@ -125,7 +128,8 @@ func TestPostUrlHandler(t *testing.T) {
 			request.Header.Set("content-type",test.contentType)
 
 			w:=httptest.NewRecorder()
-			store := repository.NewMemory()
+			store, err:= repository.NewMemory("fileMemoryTest.txt")
+			require.NoError(t, err)
 			h := New(service.NewShortener(store, redirect))
 			h.PostUrlHandler(w, request)
 
@@ -145,6 +149,104 @@ func TestPostUrlHandler(t *testing.T) {
 				assert.Equal(t, test.data, originalURL)
 			} else {
 				assert.Equal(t, test.want.response, body)
+			}
+
+			assert.Equal(t, test.want.contentType, res.Header.Get("content-type"))
+		})
+	}
+}
+
+func TestPostJsonUrlHandler(t *testing.T) {
+	const redirect = "http://localhost:8080/"
+
+	type want struct {
+		code int
+		response string
+		contentType string
+	}
+	tests := []struct {
+		name string
+		want want
+		method string
+		contentType string
+		data string
+	}{
+		{
+			name: "positive test #1",
+			want: want{
+				code:        201,
+				response:    redirect,
+				contentType: "application/json",
+			},
+			method: http.MethodPost,
+			contentType: "application/json",
+			data: `{"url": "https://practicum.yandex.ru"}`,
+		},
+		{
+			name: "negative test #2 other contentType",
+			want: want{
+				code:400,
+				response:"Only content-type: application/json are allowed!\n",
+				contentType:"text/plain; charset=utf-8",
+			},
+			method: http.MethodPost,
+			contentType: "text/plain",
+			data: "https://practicum.yandex.ru/",
+		},
+		{
+			name: "negative test #3 no body",
+			want: want{
+				code:400,
+				response:"unexpected end of JSON input\n",
+				contentType:"text/plain; charset=utf-8",
+			},
+			method: http.MethodPost,
+			contentType: "application/json",
+			data: ``,
+		},
+		{
+			name: "negative test #4 no URL",
+			want: want{
+				code:400,
+				response:"URL is required\n",
+				contentType:"text/plain; charset=utf-8",
+			},
+			method: http.MethodPost,
+			contentType: "application/json",
+			data: `{"url": ""}`,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(test.method,"/", strings.NewReader(test.data))
+			request.Header.Set("content-type",test.contentType)
+
+			w:=httptest.NewRecorder()
+			store,err := repository.NewMemory("fileMemoryTest.txt")
+			require.NoError(t, err)
+			h := New(service.NewShortener(store, redirect))
+			h.PostJsonUrlHandler(w, request)
+
+			res := w.Result()
+			assert.Equal(t, test.want.code, res.StatusCode)
+			defer res.Body.Close()
+			resBody,err :=io.ReadAll(res.Body)
+			require.NoError(t,err)
+			if test.want.code == http.StatusCreated {
+				var resp model.Response
+				var req model.Request
+				err = json.Unmarshal(resBody, &resp)
+				require.NoError(t,err)
+				assert.True(t, strings.HasPrefix(resp.URL, test.want.response),
+					"response body should start with %q, got %q", test.want.response, resp.URL)
+				id := strings.TrimPrefix(resp.URL, test.want.response)
+				assert.NotEmpty(t, id)
+				originalURL, ok := store.Get(id)
+				assert.True(t, ok)
+				err = json.Unmarshal([]byte(test.data), &req)
+				assert.Equal(t, req.URL, originalURL)
+			} else {
+				assert.Equal(t, test.want.response, string(resBody))
 			}
 
 			assert.Equal(t, test.want.contentType, res.Header.Get("content-type"))
