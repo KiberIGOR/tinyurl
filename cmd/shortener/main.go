@@ -42,8 +42,8 @@ func main() {
 	r.Use(logger.RequestLogger)
 	r.Use(compress.GzipMiddleware)
 	
-	r.Post("/", h.PostUrlHandler)
-	r.Post("/api/shorten", h.PostJsonUrlHandler)
+	r.Post("/", h.PostURLHandler)
+	r.Post("/api/shorten", h.PostJSONURLHandler)
 	r.Get("/{id}", h.GetURL)
 	r.Get("/ping", h.GetPingHandler)
 	err = http.ListenAndServe(cfg.Address, r)

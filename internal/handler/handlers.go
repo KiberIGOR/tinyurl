@@ -44,7 +44,7 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func (h *Handler) PostUrlHandler(res http.ResponseWriter, req *http.Request) {
+func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 	content := req.Header.Get("content-type")
 	if content != "text/plain" && content != "text/plain;charset=UTF-8" {
 		http.Error(res, "Only content-type: text/plain are allowed!", http.StatusBadRequest)
@@ -72,7 +72,7 @@ func (h *Handler) PostUrlHandler(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (h *Handler) PostJsonUrlHandler(res http.ResponseWriter, req *http.Request) {
+func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request) {
 	content := req.Header.Get("content-type")
 	if content != "application/json" {
 		http.Error(res, "Only content-type: application/json are allowed!", http.StatusBadRequest)

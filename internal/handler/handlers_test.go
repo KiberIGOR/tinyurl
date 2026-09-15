@@ -140,7 +140,7 @@ func TestPostUrlHandler(t *testing.T) {
 			store, err:= repository.NewMemory("fileMemoryTest.txt")
 			require.NoError(t, err)
 			h := New(service.NewShortener(store, redirect),m)
-			h.PostUrlHandler(w, request)
+			h.PostURLHandler(w, request)
 
 			res := w.Result()
 			assert.Equal(t, test.want.code, res.StatusCode)
@@ -238,7 +238,7 @@ func TestPostJsonUrlHandler(t *testing.T) {
 			store,err := repository.NewMemory("fileMemoryTest.txt")
 			require.NoError(t, err)
 			h := New(service.NewShortener(store, redirect), m)
-			h.PostJsonUrlHandler(w, request)
+			h.PostJSONURLHandler(w, request)
 
 			res := w.Result()
 			assert.Equal(t, test.want.code, res.StatusCode)
@@ -257,6 +257,7 @@ func TestPostJsonUrlHandler(t *testing.T) {
 				originalURL, ok := store.Get(id)
 				assert.True(t, ok)
 				err = json.Unmarshal([]byte(test.data), &req)
+				require.NoError(t, err)
 				assert.Equal(t, req.URL, originalURL)
 			} else {
 				assert.Equal(t, test.want.response, string(resBody))
