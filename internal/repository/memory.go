@@ -13,10 +13,10 @@ import (
 )
 
 var ErrAlreadyExist = errors.New("URL already exist")
-var ErrOpenFile = errors.New("Error while seving memory in file")
-var ErrMakingJson = errors.New("Error while making JSON")
-var ErrParsingJson = errors.New("Error while parsing JSON")
-var ErrWritingJson = errors.New("Error while writing JSON")
+var ErrOpenFile = errors.New("error while saving memory in file")
+var ErrMakingJSON = errors.New("error while making JSON")
+var ErrParsingJSON = errors.New("error while parsing JSON")
+var ErrWritingJSON = errors.New("error while writing JSON")
 type Memory struct {
 	mu   sync.RWMutex
 	urls map[string]string
@@ -81,7 +81,7 @@ func (m *Memory) Save(id, originalURL string) error {
 	}
 	err = json.Unmarshal(memorybyte, &memory)
 	if err != nil {
-			return fmt.Errorf("%w: %w", ErrParsingJson, err)
+			return fmt.Errorf("%w: %w", ErrParsingJSON, err)
 	}
 	
 	memory = append(memory,model.MemoryString{
@@ -91,12 +91,12 @@ func (m *Memory) Save(id, originalURL string) error {
 	})
 	writebyte, err := json.Marshal(memory)
 	if err != nil {
-        return fmt.Errorf("%w: %w", ErrMakingJson, err)
+        return fmt.Errorf("%w: %w", ErrMakingJSON, err)
   }
 
 	err = os.WriteFile(m.fileName, writebyte, 0666)
 	if err != nil {
-        return fmt.Errorf("%w: %w", ErrWritingJson, err)
+        return fmt.Errorf("%w: %w", ErrWritingJSON, err)
   }
 	m.urls[id] = originalURL
 	return nil

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -15,13 +16,17 @@ type Shortener interface {
 	Shorten(originalURL string) (shortURL string, err error)
 	Resolve(id string) (originalURL string, err error)
 }
+type Pinger interface {
+	Ping(ctx context.Context) error
+}
 
 type Handler struct {
 	shortener Shortener
+	pinger Pinger
 }
 
-func New(shortener Shortener) *Handler {
-	return &Handler{shortener: shortener}
+func New(shortener Shortener, pinger Pinger) *Handler {
+	return &Handler{shortener: shortener, pinger: pinger}
 }
 
 func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
@@ -39,7 +44,7 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func (h *Handler) PostUrlHandler(res http.ResponseWriter, req *http.Request) {
+func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 	content := req.Header.Get("content-type")
 	if content != "text/plain" && content != "text/plain;charset=UTF-8" {
 		http.Error(res, "Only content-type: text/plain are allowed!", http.StatusBadRequest)
@@ -67,7 +72,7 @@ func (h *Handler) PostUrlHandler(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (h *Handler) PostJsonUrlHandler(res http.ResponseWriter, req *http.Request) {
+func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request) {
 	content := req.Header.Get("content-type")
 	if content != "application/json" {
 		http.Error(res, "Only content-type: application/json are allowed!", http.StatusBadRequest)
@@ -104,4 +109,12 @@ func (h *Handler) PostJsonUrlHandler(res http.ResponseWriter, req *http.Request)
 	if _, err = res.Write(resp); err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
+}
+
+func (h *Handler) GetPingHandler(res http.ResponseWriter, req *http.Request) {
+	if err := h.pinger.Ping(req.Context()); err !=nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	res.WriteHeader(http.StatusOK)
 }
