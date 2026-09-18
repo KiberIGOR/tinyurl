@@ -80,7 +80,7 @@ func main() {
 }
 
 func runMigrations(dsn string) error {
-    source, err := iofs.New(migrations.FS, "migrations")
+    source, err := iofs.New(migrations.FS, ".")
     if err != nil {
         return err
     }
