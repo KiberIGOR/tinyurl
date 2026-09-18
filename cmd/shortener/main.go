@@ -15,9 +15,14 @@ import (
 	"github.com/KiberIGOR/tinyurl/internal/logger"
 	"github.com/KiberIGOR/tinyurl/internal/repository"
 	"github.com/KiberIGOR/tinyurl/internal/service"
+	"github.com/KiberIGOR/tinyurl/migrations"
 	"github.com/go-chi/chi/v5"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
+
 //stub
 type nilPinger struct{}
 
@@ -36,6 +41,9 @@ func main() {
 	var err error
 	switch {
 	case cfg.DataBaseDSN != "":
+		if err := runMigrations(cfg.DataBaseDSN); err != nil {
+    	log.Fatal(err)
+		}
 		db, err := sql.Open("pgx", cfg.DataBaseDSN)
 		if err != nil {
         panic(err)
@@ -69,4 +77,20 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func runMigrations(dsn string) error {
+    source, err := iofs.New(migrations.FS, "migrations")
+    if err != nil {
+        return err
+    }
+    m, err := migrate.NewWithSourceInstance("iofs", source, dsn)
+    if err != nil {
+        return err
+    }
+    defer m.Close()
+    if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+        return err
+    }
+    return nil
 }
