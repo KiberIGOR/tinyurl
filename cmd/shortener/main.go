@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"net/http"
 
 	"log"
@@ -16,6 +18,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
+//stub
+type nilPinger struct{}
+
+func (nilPinger) Ping(ctx context.Context) error {
+  return errors.New("database is not configured")
+}
 
 func main() {
 	cfg := config.Parse()
@@ -23,20 +31,31 @@ func main() {
 	if err:=logger.Initialize("info");err!=nil {
 		log.Fatal(err)
 	}
-
-  db, err := sql.Open("pgx", cfg.DataBaseDSN)
-	if err != nil {
+  var store service.URLRepository
+	var pinger handler.Pinger
+	var err error
+	switch {
+	case cfg.DataBaseDSN != "":
+		db, err := sql.Open("pgx", cfg.DataBaseDSN)
+		if err != nil {
         panic(err)
     }
-  defer db.Close()
-
-	store,err := repository.NewMemory(cfg.FileStoragePath)
-	dbstore := repository.NewDB(db)
-	if err != nil {
-		log.Fatal(err)
-	}
+		defer db.Close()
+		pg := repository.NewDB(db)
+		store = pg
+		pinger = pg
+	case cfg.FileStoragePath != "":
+		store, err = repository.NewFile(cfg.FileStoragePath)
+		if err != nil {
+        log.Fatal(err)
+  	}
+		pinger = nilPinger{}
+	default:
+		store = repository.NewMemory()
+		pinger = nilPinger{}
+	}	
 	svc := service.NewShortener(store, cfg.BaseURL)
-	h := handler.New(svc, dbstore)
+	h := handler.New(svc, pinger)
 
 	r := chi.NewRouter()
 	r.Use(logger.RequestLogger)

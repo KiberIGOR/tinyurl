@@ -51,7 +51,7 @@ func TestGetUrlHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			store, err := repository.NewMemory("fileMemoryTest.txt")
+			store, err := repository.NewFile("fileMemoryTest.txt")
 			ctrl := gomock.NewController(t)
    		defer ctrl.Finish()
    		m := mocks.NewMockPinger(ctrl)
@@ -137,7 +137,7 @@ func TestPostUrlHandler(t *testing.T) {
    		m := mocks.NewMockPinger(ctrl)
 
 			w:=httptest.NewRecorder()
-			store, err:= repository.NewMemory("fileMemoryTest.txt")
+			store, err:= repository.NewFile("fileMemoryTest.txt")
 			require.NoError(t, err)
 			h := New(service.NewShortener(store, redirect),m)
 			h.PostURLHandler(w, request)
@@ -235,7 +235,7 @@ func TestPostJsonUrlHandler(t *testing.T) {
    		m := mocks.NewMockPinger(ctrl)
 
 			w:=httptest.NewRecorder()
-			store,err := repository.NewMemory("fileMemoryTest.txt")
+			store,err := repository.NewFile("fileMemoryTest.txt")
 			require.NoError(t, err)
 			h := New(service.NewShortener(store, redirect), m)
 			h.PostJSONURLHandler(w, request)

@@ -2,7 +2,6 @@ package config
 
 import (
 	"flag"
-	"fmt"
 	"os"
 )
 
@@ -15,12 +14,12 @@ type Config struct {
 
 func Parse() *Config {
 	cfg := &Config{}
-	ps := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable",
-                      `localhost`, `video`, `video`, `video`)
 	flag.StringVar(&cfg.Address, "a", ":8080", "address and port to run server")
 	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080/", "address and port for redirect url")
-	flag.StringVar(&cfg.FileStoragePath, "f", "fileMemory.txt", "file name witch will be use for storage")
-	flag.StringVar(&cfg.DataBaseDSN, "d", ps, "dsn string for database setting")
+	//fileMemory.txt
+	flag.StringVar(&cfg.FileStoragePath, "f", "", "file name witch will be use for storage")
+	// ps := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable",`localhost`, `urls`, `urls`, `urls`)
+	flag.StringVar(&cfg.DataBaseDSN, "d", "", "dsn string for database setting")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("SERVER_ADDRESS"); envRunAddr != "" {
