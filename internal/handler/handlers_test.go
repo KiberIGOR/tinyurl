@@ -58,7 +58,7 @@ func TestGetUrlHandler(t *testing.T) {
    		m := mocks.NewMockPinger(ctrl)
 
 			require.NoError(t, err)
-			store.Save("EwHXdJfB", "https://practicum.yandex.ru/")
+			store.Save(context.Background(),"EwHXdJfB", "https://practicum.yandex.ru/")
 			h := New(service.NewShortener(store, "http://localhost:8080/"),m)
 
 			request := httptest.NewRequest(test.method, "/"+test.path, nil)
