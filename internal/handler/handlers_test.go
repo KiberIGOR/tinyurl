@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -153,7 +154,7 @@ func TestPostUrlHandler(t *testing.T) {
 					"response body should start with %q, got %q", test.want.response, body)
 				id := strings.TrimPrefix(body, test.want.response)
 				assert.NotEmpty(t, id)
-				originalURL, ok := store.Get(id)
+				originalURL, ok := store.Get(context.Background(),id)
 				assert.True(t, ok)
 				assert.Equal(t, test.data, originalURL)
 			} else {
@@ -254,7 +255,7 @@ func TestPostJsonUrlHandler(t *testing.T) {
 					"response body should start with %q, got %q", test.want.response, resp.URL)
 				id := strings.TrimPrefix(resp.URL, test.want.response)
 				assert.NotEmpty(t, id)
-				originalURL, ok := store.Get(id)
+				originalURL, ok := store.Get(context.Background(),id)
 				assert.True(t, ok)
 				err = json.Unmarshal([]byte(test.data), &req)
 				require.NoError(t, err)
