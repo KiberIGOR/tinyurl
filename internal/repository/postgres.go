@@ -2,10 +2,10 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"sync"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -37,7 +37,7 @@ func (d *DB) Save(id,originalURL string) (error) {
         // строка нашлась
         return ErrAlreadyExist
     }
-    if !errors.Is(err, sql.ErrNoRows) {
+    if !errors.Is(err, pgx.ErrNoRows) {
         // реальная ошибка БД
         return err
     }

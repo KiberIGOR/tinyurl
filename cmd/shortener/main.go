@@ -76,8 +76,8 @@ func main() {
 	
 	r.Post("/", h.PostURLHandler)
 	r.Post("/api/shorten", h.PostJSONURLHandler)
-	r.Get("/{id}", h.GetURL)
 	r.Get("/ping", h.GetPingHandler)
+	r.Get("/{id}", h.GetURL)
 	err = http.ListenAndServe(cfg.Address, r)
 	if err != nil {
 		log.Fatal(err)

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/KiberIGOR/tinyurl/internal/model"
 	"github.com/KiberIGOR/tinyurl/internal/service"
@@ -112,7 +113,10 @@ func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request)
 }
 
 func (h *Handler) GetPingHandler(res http.ResponseWriter, req *http.Request) {
-	if err := h.pinger.Ping(req.Context()); err !=nil {
+	ctx, cancel := context.WithTimeout(req.Context(), 2*time.Second)
+	defer cancel()
+
+	if err := h.pinger.Ping(ctx); err !=nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
