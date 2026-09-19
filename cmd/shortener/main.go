@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"log"
@@ -43,24 +41,15 @@ func main() {
 	var err error
 	switch {
 	case cfg.DataBaseDSN != "":
-		log.Println("migrations start")
-		if err := runMigrations(cfg.DataBaseDSN); err != nil {
-    	log.Fatal(err)
-		}
-		log.Println("migrations done")
-		log.Println("pool start")
-		ctx,stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-		defer stop()
-		//создаем пулл соединений к бд:
-		pool, err := newPool(ctx, cfg.DataBaseDSN)
-		if err != nil {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    pool, err := pgxpool.New(ctx, cfg.DataBaseDSN)
+    if err != nil {
         log.Fatal(err)
     }
-		log.Println("listen", cfg.Address)
-		defer pool.Close()
-		pg := repository.NewDB(pool)
-		store = pg
-		pinger = pg
+    defer pool.Close()
+    pinger = repository.NewDB(pool)
+    store = repository.NewMemory()
 	case cfg.FileStoragePath != "":
 		store, err = repository.NewFile(cfg.FileStoragePath)
 		if err != nil {
