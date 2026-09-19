@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"log"
-
-	"database/sql"
 
 	"github.com/KiberIGOR/tinyurl/internal/compress"
 	"github.com/KiberIGOR/tinyurl/internal/config"
@@ -20,6 +21,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -44,12 +46,15 @@ func main() {
 		if err := runMigrations(cfg.DataBaseDSN); err != nil {
     	log.Fatal(err)
 		}
-		db, err := sql.Open("pgx", cfg.DataBaseDSN)
+		ctx,stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+		// db, err := sql.Open("pgx", cfg.DataBaseDSN)
+		pool, err := newPool(ctx, cfg.DataBaseDSN)
 		if err != nil {
-        panic(err)
+        log.Fatal(err)
     }
-		defer db.Close()
-		pg := repository.NewDB(db)
+		defer pool.Close()
+		pg := repository.NewDB(pool)
 		store = pg
 		pinger = pg
 	case cfg.FileStoragePath != "":
@@ -93,4 +98,29 @@ func runMigrations(dsn string) error {
         return err
     }
     return nil
+}
+
+func newPool(ctx context.Context,dsn string) (*pgxpool.Pool, error) {
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	cfg.MaxConns = 10
+	cfg.MinConns = 2
+	cfg.MaxConnLifetime = 10*time.Minute
+	cfg.MaxConnIdleTime = 5*time.Minute
+
+	pool,err := pgxpool.NewWithConfig(ctx,cfg)
+	if err!= nil {
+		return nil,err
+	}
+
+	//Пингуем с таймаутом, чтобы сразу падать, если БД не достпна
+	pingCtx,cancel := context.WithTimeout(ctx ,3*time.Second)
+	defer cancel()
+	if err := pool.Ping(pingCtx); err!=nil {
+		pool.Close()
+		return nil,err
+	}
+	return pool, nil
 }

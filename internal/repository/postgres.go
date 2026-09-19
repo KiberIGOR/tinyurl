@@ -5,17 +5,19 @@ import (
 	"database/sql"
 	"errors"
 	"sync"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type DB struct {
     mu sync.RWMutex
-    db *sql.DB
+    db *pgxpool.Pool
 }
-func NewDB(db *sql.DB) *DB {
+func NewDB(db *pgxpool.Pool) *DB {
     return &DB{db: db}
 }
 func (d *DB) Ping(ctx context.Context) error {
-    return d.db.PingContext(ctx)
+    return d.db.Ping(ctx)
 }
 func (d *DB) Get(id string) (string, bool) {
     d.mu.Lock()
@@ -39,7 +41,7 @@ func (d *DB) Save(id,originalURL string) (error) {
         // реальная ошибка БД
         return err
     }
-    _, err = d.db.ExecContext(context.Background(), "INSERT INTO urls (short_url,original_url) VALUES ($1,$2)",id,originalURL)
+    _, err = d.db.Exec(context.Background(), "INSERT INTO urls (short_url,original_url) VALUES ($1,$2)",id,originalURL)
     if err != nil {
         return err
     }
@@ -47,7 +49,7 @@ func (d *DB) Save(id,originalURL string) (error) {
 }
 
 func (d *DB) get(id string) (string, error) {
-    row := d.db.QueryRowContext(context.Background(),"SELECT original_url FROM urls WHERE short_url = $1", id)
+    row := d.db.QueryRow(context.Background(),"SELECT original_url FROM urls WHERE short_url = $1", id)
     var originalURL string
     err := row.Scan(&originalURL)
     return originalURL, err
