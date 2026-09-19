@@ -48,7 +48,6 @@ func main() {
 		}
 		ctx,stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
-		// db, err := sql.Open("pgx", cfg.DataBaseDSN)
 		pool, err := newPool(ctx, cfg.DataBaseDSN)
 		if err != nil {
         log.Fatal(err)
