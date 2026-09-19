@@ -43,9 +43,12 @@ func main() {
 	var err error
 	switch {
 	case cfg.DataBaseDSN != "":
+		log.Println("migrations start")
 		if err := runMigrations(cfg.DataBaseDSN); err != nil {
     	log.Fatal(err)
 		}
+		log.Println("migrations done")
+		log.Println("pool start")
 		ctx,stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
 		//создаем пулл соединений к бд:
@@ -53,6 +56,7 @@ func main() {
 		if err != nil {
         log.Fatal(err)
     }
+		log.Println("listen", cfg.Address)
 		defer pool.Close()
 		pg := repository.NewDB(pool)
 		store = pg
@@ -106,7 +110,7 @@ func newPool(ctx context.Context,dsn string) (*pgxpool.Pool, error) {
 		return nil, err
 	}
 	cfg.MaxConns = 10
-	cfg.MinConns = 2
+	cfg.MinConns = 0
 	cfg.MaxConnLifetime = 10*time.Minute
 	cfg.MaxConnIdleTime = 5*time.Minute
 
