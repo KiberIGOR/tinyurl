@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"log"
@@ -41,7 +43,7 @@ func main() {
 	var err error
 	switch {
 	case cfg.DataBaseDSN != "":
-    initCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+    initCtx, cancel := signal.NotifyContext(context.Background(),syscall.SIGINT,syscall.SIGTERM)
     defer cancel()
     if err := runMigrations(cfg.DataBaseDSN); err != nil {
         log.Fatal("migrate: ", err)
@@ -103,7 +105,7 @@ func newPool(ctx context.Context,dsn string) (*pgxpool.Pool, error) {
 		return nil, err
 	}
 	cfg.MaxConns = 10
-	cfg.MinConns = 0
+	cfg.MinConns = 2
 	cfg.MaxConnLifetime = 10*time.Minute
 	cfg.MaxConnIdleTime = 5*time.Minute
 
