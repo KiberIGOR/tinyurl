@@ -41,15 +41,19 @@ func main() {
 	var err error
 	switch {
 	case cfg.DataBaseDSN != "":
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    initCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
     defer cancel()
-    pool, err := pgxpool.New(ctx, cfg.DataBaseDSN)
+    if err := runMigrations(cfg.DataBaseDSN); err != nil {
+        log.Fatal("migrate: ", err)
+    }
+    pool, err := pgxpool.New(initCtx, cfg.DataBaseDSN)
     if err != nil {
-        log.Fatal(err)
+        log.Fatal("pool: ", err)
     }
     defer pool.Close()
-    pinger = repository.NewDB(pool)
-    store = repository.NewMemory()
+    pg := repository.NewDB(pool)
+    store = pg
+    pinger = pg
 	case cfg.FileStoragePath != "":
 		store, err = repository.NewFile(cfg.FileStoragePath)
 		if err != nil {
