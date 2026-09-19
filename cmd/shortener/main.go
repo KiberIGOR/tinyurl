@@ -48,6 +48,7 @@ func main() {
 		}
 		ctx,stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
+		//создаем пулл соединений к бд:
 		pool, err := newPool(ctx, cfg.DataBaseDSN)
 		if err != nil {
         log.Fatal(err)
