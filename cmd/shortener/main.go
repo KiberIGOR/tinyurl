@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"log"
@@ -43,7 +41,7 @@ func main() {
 	var err error
 	switch {
 	case cfg.DataBaseDSN != "":
-    initCtx, cancel := signal.NotifyContext(context.Background(),syscall.SIGINT,syscall.SIGTERM)
+    initCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
     defer cancel()
     if err := runMigrations(cfg.DataBaseDSN); err != nil {
         log.Fatal("migrate: ", err)
