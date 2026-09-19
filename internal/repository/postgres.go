@@ -19,20 +19,20 @@ func NewDB(db *pgxpool.Pool) *DB {
 func (d *DB) Ping(ctx context.Context) error {
     return d.db.Ping(ctx)
 }
-func (d *DB) Get(id string) (string, bool) {
+func (d *DB) Get(ctx context.Context, id string) (string, bool) {
     d.mu.Lock()
     defer d.mu.Unlock()
-    originalURL, err := d.get(id)
+    originalURL, err := d.get(ctx,id)
     if err != nil {
         return "", false
     }
     return originalURL, true
 }
 
-func (d *DB) Save(id,originalURL string) (error) {
+func (d *DB) Save(ctx context.Context, id,originalURL string) (error) {
     d.mu.Lock()
     defer d.mu.Unlock()
-    _, err := d.get(id)
+    _, err := d.get(ctx,id)
     if err == nil {
         // строка нашлась
         return ErrAlreadyExist
@@ -41,15 +41,15 @@ func (d *DB) Save(id,originalURL string) (error) {
         // реальная ошибка БД
         return err
     }
-    _, err = d.db.Exec(context.Background(), "INSERT INTO urls (short_url,original_url) VALUES ($1,$2)",id,originalURL)
+    _, err = d.db.Exec(ctx, "INSERT INTO urls (short_url,original_url) VALUES ($1,$2)",id,originalURL)
     if err != nil {
         return err
     }
     return nil
 }
 
-func (d *DB) get(id string) (string, error) {
-    row := d.db.QueryRow(context.Background(),"SELECT original_url FROM urls WHERE short_url = $1", id)
+func (d *DB) get(ctx context.Context, id string) (string, error) {
+    row := d.db.QueryRow(ctx,"SELECT original_url FROM urls WHERE short_url = $1", id)
     var originalURL string
     err := row.Scan(&originalURL)
     return originalURL, err

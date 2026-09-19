@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -18,14 +19,14 @@ func NewMemory() *Memory {
 	}
 }
 
-func (m *Memory) Get(id string) (string, bool) {
+func (m *Memory) Get(ctx context.Context, id string) (string, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	url, ok := m.get(id)
 	return url, ok
 }
 
-func (m *Memory) Save(id, originalURL string) error {
+func (m *Memory) Save(ctx context.Context, id, originalURL string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.get(id); ok {

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,14 +52,14 @@ func NewFile(fileName string) (*FileMemory,error) {
 	}, nil
 }
 
-func (m *FileMemory) Get(id string) (string, bool) {
+func (m *FileMemory) Get(ctx context.Context, id string) (string, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	url, ok := m.get(id)
 	return url, ok
 }
 
-func (m *FileMemory) Save(id, originalURL string) error {
+func (m *FileMemory) Save(ctx context.Context, id, originalURL string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.get(id); ok {
