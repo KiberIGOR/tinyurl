@@ -9,13 +9,17 @@ type Config struct {
 	Address string
 	BaseURL string
 	FileStoragePath string
+	DataBaseDSN string
 }
 
 func Parse() *Config {
 	cfg := &Config{}
 	flag.StringVar(&cfg.Address, "a", ":8080", "address and port to run server")
 	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080/", "address and port for redirect url")
-	flag.StringVar(&cfg.FileStoragePath, "f", "fileMemory.txt", "file name witch will be use for storage")
+	//fileMemory.txt
+	flag.StringVar(&cfg.FileStoragePath, "f", "", "file name witch will be use for storage")
+	// ps := fmt.Sprintf("postgres://%s:%s@localhost:5432/urls?sslmode=disable","urls","urls")
+	flag.StringVar(&cfg.DataBaseDSN, "d", "", "dsn string for database setting")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("SERVER_ADDRESS"); envRunAddr != "" {
@@ -28,6 +32,10 @@ func Parse() *Config {
 
 	if envRunAddr := os.Getenv("FILE_STORAGE_PATH"); envRunAddr != "" {
         cfg.FileStoragePath = envRunAddr
+  }
+
+	if envRunAddr := os.Getenv("DATABASE_DSN"); envRunAddr != "" {
+        cfg.DataBaseDSN = envRunAddr
   }
 
 	return cfg

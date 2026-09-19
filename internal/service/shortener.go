@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -14,8 +15,8 @@ var ErrNotFound = errors.New("URL not found")
 var ErrCollision = errors.New("not found correct id for URL(collision)")
 
 type URLRepository interface {
-	Get(id string) (string, bool)
-	Save(id, originalURL string) error
+	Get(ctx context.Context, id string) (string, bool)
+	Save(ctx context.Context, id, originalURL string) error
 }
 
 type Shortener struct {
@@ -30,14 +31,14 @@ func NewShortener(repo URLRepository, baseURL string) *Shortener {
 	}
 }
 
-func (s *Shortener) Shorten(originalURL string) (string, error) {
+func (s *Shortener) Shorten(ctx context.Context,originalURL string) (string, error) {
 	const n int = 5
 	for i:=0; i<n; i++ {
 		id, err := generateID()
 		if err != nil {
 			return "", err
 		}
-		err = s.repo.Save(id, originalURL)
+		err = s.repo.Save(ctx, id, originalURL)
 		if err !=nil {
 			if errors.Is(err,repository.ErrAlreadyExist) {
 				continue
@@ -49,8 +50,8 @@ func (s *Shortener) Shorten(originalURL string) (string, error) {
 	return "", ErrCollision
 }
 
-func (s *Shortener) Resolve(id string) (string, error) {
-	originalURL, ok := s.repo.Get(id)
+func (s *Shortener) Resolve(ctx context.Context,id string) (string, error) {
+	originalURL, ok := s.repo.Get(ctx, id)
 	if !ok {
 		return "", ErrNotFound
 	}
