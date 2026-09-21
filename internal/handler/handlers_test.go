@@ -228,7 +228,7 @@ func TestPostJsonUrlHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			request := httptest.NewRequest(test.method,"/", strings.NewReader(test.data))
+			request := httptest.NewRequest(test.method,"/api/shorten", strings.NewReader(test.data))
 			request.Header.Set("content-type",test.contentType)
 
 			ctrl := gomock.NewController(t)
@@ -260,6 +260,107 @@ func TestPostJsonUrlHandler(t *testing.T) {
 				err = json.Unmarshal([]byte(test.data), &req)
 				require.NoError(t, err)
 				assert.Equal(t, req.URL, originalURL)
+			} else {
+				assert.Equal(t, test.want.response, string(resBody))
+			}
+
+			assert.Equal(t, test.want.contentType, res.Header.Get("content-type"))
+		})
+	}
+}
+
+func TestPostJSONMassiveURLHandler(t *testing.T) {
+	const redirect = "http://localhost:8080/"
+
+	type want struct {
+		code int
+		response string
+		contentType string
+	}
+	tests := []struct {
+		name string
+		want want
+		method string
+		contentType string
+		data string
+	}{
+		{
+			name: "positive test #1",
+			want: want{
+				code:        201,
+				response:    redirect,
+				contentType: "application/json",
+			},
+			method: http.MethodPost,
+			contentType: "application/json",
+			data: `[
+    {
+        "correlation_id": "1",
+        "original_url": "https://practicum.yandex.ru"
+    },
+    {
+        "correlation_id": "2",
+        "original_url": "https://practicum.yandex.ru"
+    }
+]`,
+		},
+		{
+			name: "negative test #2 other contentType",
+			want: want{
+				code:400,
+				response:"Only content-type: application/json are allowed!\n",
+				contentType:"text/plain; charset=utf-8",
+			},
+			method: http.MethodPost,
+			contentType: "text/plain",
+			data: "https://practicum.yandex.ru/",
+		},
+		{
+			name: "negative test #3 no body",
+			want: want{
+				code:400,
+				response:"unexpected end of JSON input\n",
+				contentType:"text/plain; charset=utf-8",
+			},
+			method: http.MethodPost,
+			contentType: "application/json",
+			data: ``,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(test.method,"/api/shorten/batch", strings.NewReader(test.data))
+			request.Header.Set("content-type",test.contentType)
+
+			ctrl := gomock.NewController(t)
+   		defer ctrl.Finish()
+   		m := mocks.NewMockPinger(ctrl)
+
+			w:=httptest.NewRecorder()
+			store,err := repository.NewFile("fileMemoryTest.txt")
+			require.NoError(t, err)
+			h := New(service.NewShortener(store, redirect), m)
+			h.PostJSONMassiveURLHandler(w, request)
+
+			res := w.Result()
+			assert.Equal(t, test.want.code, res.StatusCode)
+			defer res.Body.Close()
+			resBody,err :=io.ReadAll(res.Body)
+			require.NoError(t,err)
+			if test.want.code == http.StatusCreated {
+				var resp []model.MassiveResponse
+				var req []model.MassiveRequest
+				err = json.Unmarshal(resBody, &resp)
+				require.NoError(t,err)
+				assert.True(t, strings.HasPrefix(resp[0].ShortURL, test.want.response),
+					"response body should start with %q, got %q", test.want.response, resp[0].ShortURL)
+				id := strings.TrimPrefix(resp[0].ShortURL, test.want.response)
+				assert.NotEmpty(t, id)
+				originalURL, ok := store.Get(context.Background(),id)
+				assert.True(t, ok)
+				err = json.Unmarshal([]byte(test.data), &req)
+				require.NoError(t, err)
+				assert.Equal(t, req[0].OriginalURL, originalURL)
 			} else {
 				assert.Equal(t, test.want.response, string(resBody))
 			}
