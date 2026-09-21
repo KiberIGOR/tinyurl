@@ -46,7 +46,7 @@ func main() {
     if err := runMigrations(cfg.DataBaseDSN); err != nil {
         log.Fatal("migrate: ", err)
     }
-    pool, err := pgxpool.New(initCtx, cfg.DataBaseDSN)
+    pool, err := newPool(initCtx, cfg.DataBaseDSN)
     if err != nil {
         log.Fatal("pool: ", err)
     }
