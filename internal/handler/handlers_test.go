@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -8,11 +9,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/KiberIGOR/tinyurl/internal/mocks"
 	"github.com/KiberIGOR/tinyurl/internal/model"
 	"github.com/KiberIGOR/tinyurl/internal/repository"
 	"github.com/KiberIGOR/tinyurl/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 func TestGetUrlHandler(t *testing.T) {
 	type want struct {
@@ -49,10 +52,14 @@ func TestGetUrlHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			store, err := repository.NewMemory("fileMemoryTest.txt")
+			store, err := repository.NewFile("fileMemoryTest.txt")
+			ctrl := gomock.NewController(t)
+   		defer ctrl.Finish()
+   		m := mocks.NewMockPinger(ctrl)
+
 			require.NoError(t, err)
-			store.Save("EwHXdJfB", "https://practicum.yandex.ru/")
-			h := New(service.NewShortener(store, "http://localhost:8080/"))
+			store.Save(context.Background(),"EwHXdJfB", "https://practicum.yandex.ru/")
+			h := New(service.NewShortener(store, "http://localhost:8080/"),m)
 
 			request := httptest.NewRequest(test.method, "/"+test.path, nil)
 			request.SetPathValue("id", test.path)
@@ -126,12 +133,15 @@ func TestPostUrlHandler(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			request := httptest.NewRequest(test.method,"/", strings.NewReader(test.data))
 			request.Header.Set("content-type",test.contentType)
+			ctrl := gomock.NewController(t)
+   		defer ctrl.Finish()
+   		m := mocks.NewMockPinger(ctrl)
 
 			w:=httptest.NewRecorder()
-			store, err:= repository.NewMemory("fileMemoryTest.txt")
+			store, err:= repository.NewFile("fileMemoryTest.txt")
 			require.NoError(t, err)
-			h := New(service.NewShortener(store, redirect))
-			h.PostUrlHandler(w, request)
+			h := New(service.NewShortener(store, redirect),m)
+			h.PostURLHandler(w, request)
 
 			res := w.Result()
 			assert.Equal(t, test.want.code, res.StatusCode)
@@ -144,7 +154,7 @@ func TestPostUrlHandler(t *testing.T) {
 					"response body should start with %q, got %q", test.want.response, body)
 				id := strings.TrimPrefix(body, test.want.response)
 				assert.NotEmpty(t, id)
-				originalURL, ok := store.Get(id)
+				originalURL, ok := store.Get(context.Background(),id)
 				assert.True(t, ok)
 				assert.Equal(t, test.data, originalURL)
 			} else {
@@ -221,11 +231,15 @@ func TestPostJsonUrlHandler(t *testing.T) {
 			request := httptest.NewRequest(test.method,"/", strings.NewReader(test.data))
 			request.Header.Set("content-type",test.contentType)
 
+			ctrl := gomock.NewController(t)
+   		defer ctrl.Finish()
+   		m := mocks.NewMockPinger(ctrl)
+
 			w:=httptest.NewRecorder()
-			store,err := repository.NewMemory("fileMemoryTest.txt")
+			store,err := repository.NewFile("fileMemoryTest.txt")
 			require.NoError(t, err)
-			h := New(service.NewShortener(store, redirect))
-			h.PostJsonUrlHandler(w, request)
+			h := New(service.NewShortener(store, redirect), m)
+			h.PostJSONURLHandler(w, request)
 
 			res := w.Result()
 			assert.Equal(t, test.want.code, res.StatusCode)
@@ -241,9 +255,10 @@ func TestPostJsonUrlHandler(t *testing.T) {
 					"response body should start with %q, got %q", test.want.response, resp.URL)
 				id := strings.TrimPrefix(resp.URL, test.want.response)
 				assert.NotEmpty(t, id)
-				originalURL, ok := store.Get(id)
+				originalURL, ok := store.Get(context.Background(),id)
 				assert.True(t, ok)
 				err = json.Unmarshal([]byte(test.data), &req)
+				require.NoError(t, err)
 				assert.Equal(t, req.URL, originalURL)
 			} else {
 				assert.Equal(t, test.want.response, string(resBody))
