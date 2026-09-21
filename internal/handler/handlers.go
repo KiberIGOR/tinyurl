@@ -158,8 +158,7 @@ func (h *Handler) PostJSONMassiveURLHandler(res http.ResponseWriter, req *http.R
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	var massiveShortURL []model.MassiveResponse = shortURL
-	resp, err := json.Marshal(massiveShortURL)
+	resp, err := json.Marshal(shortURL)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return

@@ -62,7 +62,7 @@ func (s *Shortener) Resolve(ctx context.Context,id string) (string, error) {
 
 func (s *Shortener) MassiveShorten(ctx context.Context, MassiveOriginalURL []model.MassiveRequest) ([]model.MassiveResponse, error) {
 	const n int = 5
-	for i,_ := range MassiveOriginalURL {
+	for i := range MassiveOriginalURL {
 		for j:=0; j<n; j++ {
 			//генерируем ShortURL
 			id, err := generateID()
