@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+
+	"github.com/KiberIGOR/tinyurl/internal/model"
 )
 
 var ErrAlreadyExist = errors.New("URL already exist")
@@ -33,6 +35,15 @@ func (m *Memory) Save(ctx context.Context, id, originalURL string) error {
 		return fmt.Errorf("%w: %q", ErrAlreadyExist, id)
 	}
 	m.urls[id] = originalURL
+	return nil
+}
+
+func (m *Memory) MassiveSave(ctx context.Context, MassiveURLs []model.MassiveRequest) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _,item :=range MassiveURLs {
+		m.urls[item.ShortURL] = item.OriginalURL
+	}
 	return nil
 }
 

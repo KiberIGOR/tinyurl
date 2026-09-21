@@ -103,6 +103,49 @@ func (m *FileMemory) Save(ctx context.Context, id, originalURL string) error {
 	return nil
 }
 
+func (m *FileMemory) MassiveSave(ctx context.Context, MassiveURLs []model.MassiveRequest) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	file, err := os.OpenFile(m.fileName, os.O_RDWR, 0666)
+	if err != nil {
+		return fmt.Errorf("%w: %q", ErrOpenFile, m.fileName)
+  }
+	defer file.Close()
+
+	memorybyte, err := io.ReadAll(file)
+	if err != nil {
+			return err
+		}
+	var memory []model.MemoryString 
+	if len(memorybyte) == 0 {
+    memorybyte = []byte("[]")
+	}
+	err = json.Unmarshal(memorybyte, &memory)
+	if err != nil {
+			return fmt.Errorf("%w: %w", ErrParsingJSON, err)
+	}
+
+	for _,item :=range MassiveURLs {
+		memory = append(memory,model.MemoryString{
+			ID: strconv.Itoa(len(m.urls)+1),
+			ShortURL: item.ShortURL,
+			OriginalURL: item.OriginalURL,
+		})
+		m.urls[item.ShortURL] = item.OriginalURL
+	}
+	writebyte, err := json.Marshal(memory)
+	if err != nil {
+        return fmt.Errorf("%w: %w", ErrMakingJSON, err)
+  }
+
+	err = os.WriteFile(m.fileName, writebyte, 0666)
+	if err != nil {
+        return fmt.Errorf("%w: %w", ErrWritingJSON, err)
+  }
+
+	return nil
+}
+
 func (m *FileMemory) get(id string) (string, bool)  {
 	originalURL, ok := m.urls[id]
 	return originalURL, ok

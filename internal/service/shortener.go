@@ -9,6 +9,7 @@ import (
 	"net/url"
 
 	"github.com/KiberIGOR/tinyurl/internal/repository"
+	"github.com/KiberIGOR/tinyurl/internal/model"
 )
 
 var ErrNotFound = errors.New("URL not found")
@@ -17,6 +18,7 @@ var ErrCollision = errors.New("not found correct id for URL(collision)")
 type URLRepository interface {
 	Get(ctx context.Context, id string) (string, bool)
 	Save(ctx context.Context, id, originalURL string) error
+	MassiveSave(ctx context.Context, MassiveURLs []model.MassiveRequest) error
 }
 
 type Shortener struct {
@@ -58,6 +60,56 @@ func (s *Shortener) Resolve(ctx context.Context,id string) (string, error) {
 	return originalURL, nil
 }
 
+func (s *Shortener) MassiveShorten(ctx context.Context, MassiveOriginalURL []model.MassiveRequest) ([]model.MassiveResponse, error) {
+	const n int = 5
+	for i,_ := range MassiveOriginalURL {
+		for j:=0; j<n; j++ {
+			//генерируем ShortURL
+			id, err := generateID()
+			if err != nil {
+				return nil, err
+			}
+			//проверка, что в store нет подобных id
+			_, ok := s.repo.Get(ctx, id)
+			if ok {
+				if j==(n-1){
+						return nil, ErrCollision
+				}
+				continue
+			}
+			//проверка, что в уже сгенерированных ShortURL нет id
+			for k:=0; k<i; k++ {
+				if MassiveOriginalURL[k].ShortURL == id {
+					if j==(n-1){
+						return nil, ErrCollision
+					}
+					continue
+				}
+			}
+			//записываем id
+			MassiveOriginalURL[i].ShortURL = id
+			break
+		}
+	}
+	err := s.repo.MassiveSave(ctx, MassiveOriginalURL)
+	if err!=nil {
+		return nil, fmt.Errorf("failed to store the URL's: %w", err)
+	}
+
+	out := make([]model.MassiveResponse, 0, len(MassiveOriginalURL))
+	for _,item := range MassiveOriginalURL {
+		result, err := url.JoinPath(s.baseURL,item.ShortURL)
+		if err!=nil {
+			return nil, fmt.Errorf("failed to Join ShortURL's: %w", err)
+		}
+		out = append(out, model.MassiveResponse{
+        ID:       item.ID,
+        ShortURL: result, // полный short URL
+    })
+	}
+	return out, nil
+}
+
 func generateID() (string, error) {
 	b := make([]byte, 6)
 	if _, err := rand.Read(b); err != nil {
@@ -65,3 +117,4 @@ func generateID() (string, error) {
 	}
 	return base64.URLEncoding.EncodeToString(b)[:8], nil
 }
+

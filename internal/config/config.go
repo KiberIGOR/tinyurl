@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	"fmt"
 	"os"
 )
 
@@ -18,8 +19,8 @@ func Parse() *Config {
 	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080/", "address and port for redirect url")
 	//fileMemory.txt
 	flag.StringVar(&cfg.FileStoragePath, "f", "", "file name witch will be use for storage")
-	// ps := fmt.Sprintf("postgres://%s:%s@localhost:5432/urls?sslmode=disable","urls","urls")
-	flag.StringVar(&cfg.DataBaseDSN, "d", "", "dsn string for database setting")
+	ps := fmt.Sprintf("postgres://%s:%s@localhost:5432/urls?sslmode=disable","urls","urls")
+	flag.StringVar(&cfg.DataBaseDSN, "d", ps, "dsn string for database setting")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("SERVER_ADDRESS"); envRunAddr != "" {

@@ -16,6 +16,7 @@ import (
 type Shortener interface {
 	Shorten(ctx context.Context, originalURL string) (shortURL string, err error)
 	Resolve(ctx context.Context, id string) (originalURL string, err error)
+	MassiveShorten(ctx context.Context, MassiveOriginalURL []model.MassiveRequest) ([]model.MassiveResponse, error)
 }
 type Pinger interface {
 	Ping(ctx context.Context) error
@@ -127,4 +128,46 @@ func (h *Handler) GetPingHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	res.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) PostJSONMassiveURLHandler(res http.ResponseWriter, req *http.Request) {
+	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
+	defer cancel()
+	content := req.Header.Get("content-type")
+	if content != "application/json" {
+		http.Error(res, "Only content-type: application/json are allowed!", http.StatusBadRequest)
+		return
+	}
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var bodyReq []model.MassiveRequest
+	err = json.Unmarshal(body, &bodyReq)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if len(bodyReq) == 0 {
+		http.Error(res, "URL is required", http.StatusBadRequest)
+		return
+	}
+	shortURL, err := h.shortener.MassiveShorten(ctx, bodyReq)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var massiveShortURL []model.MassiveResponse = shortURL
+	resp, err := json.Marshal(massiveShortURL)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	res.Header().Set("content-type", "application/json")
+	res.Header().Set("content-length", strconv.Itoa(len(resp)))
+	res.WriteHeader(http.StatusCreated)
+	if _, err = res.Write(resp); err != nil {
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/KiberIGOR/tinyurl/internal/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -46,6 +47,29 @@ func (d *DB) Save(ctx context.Context, id,originalURL string) (error) {
         return err
     }
     return nil
+}
+
+func (d *DB) MassiveSave(ctx context.Context, MassiveURLs []model.MassiveRequest) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+    tx,err := d.db.Begin(ctx)
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback(ctx)
+    
+    stmtName := "insert_url"
+    _, err = tx.Prepare(ctx, stmtName,"INSERT INTO urls (short_url,original_url) VALUES ($1,$2)")
+    if err != nil {
+        return err
+    }
+    for _,item :=range MassiveURLs {
+		_, err := tx.Exec(ctx,stmtName, item.ShortURL, item.OriginalURL)
+        if err != nil {
+            return err
+        }
+	}
+	return tx.Commit(ctx)
 }
 
 func (d *DB) get(ctx context.Context, id string) (string, error) {
