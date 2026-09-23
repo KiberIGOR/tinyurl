@@ -12,6 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+var ErrConflict = errors.New("original URL already exists")
+
 type DB struct {
     mu sync.RWMutex
     db *pgxpool.Pool

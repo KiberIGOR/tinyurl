@@ -10,7 +10,6 @@ import (
 )
 
 var ErrAlreadyExist = errors.New("short URL already exist")
-var ErrConflict = errors.New("original URL already exists")
 type Memory struct {
 	mu   sync.RWMutex
 	urls map[string]string
@@ -32,9 +31,6 @@ func (m *Memory) Get(ctx context.Context, id string) (string, bool) {
 func (m *Memory) Save(ctx context.Context, id, originalURL string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if shortURL, ok := m.findByOriginal(originalURL); ok {
-		return shortURL, ErrConflict
-	}
 	if _, ok := m.get(id); ok {
 		return "", fmt.Errorf("%w: %q", ErrAlreadyExist, id)
 	}
@@ -54,13 +50,4 @@ func (m *Memory) MassiveSave(ctx context.Context, MassiveURLs []model.MassiveReq
 func (m *Memory) get(id string) (string, bool)  {
 	originalURL, ok := m.urls[id]
 	return originalURL, ok
-}
-
-func (m *Memory) findByOriginal(originalURL string) (string, bool) {
-	for id, url := range m.urls {
-		if url == originalURL {
-			return id, true
-		}
-	}
-	return "", false
 }

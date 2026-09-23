@@ -62,9 +62,6 @@ func (m *FileMemory) Get(ctx context.Context, id string) (string, bool) {
 func (m *FileMemory) Save(ctx context.Context, id, originalURL string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if shortURL, ok := m.findByOriginal(originalURL); ok {
-		return shortURL, ErrConflict
-	}
 	if _, ok := m.get(id); ok {
 		return "", fmt.Errorf("%w: %q", ErrAlreadyExist, id)
 	}
@@ -152,13 +149,4 @@ func (m *FileMemory) MassiveSave(ctx context.Context, MassiveURLs []model.Massiv
 func (m *FileMemory) get(id string) (string, bool)  {
 	originalURL, ok := m.urls[id]
 	return originalURL, ok
-}
-
-func (m *FileMemory) findByOriginal(originalURL string) (string, bool) {
-	for id, url := range m.urls {
-		if url == originalURL {
-			return id, true
-		}
-	}
-	return "", false
 }
