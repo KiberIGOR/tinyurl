@@ -6,7 +6,9 @@ import (
 	"sync"
 
 	"github.com/KiberIGOR/tinyurl/internal/model"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -30,23 +32,35 @@ func (d *DB) Get(ctx context.Context, id string) (string, bool) {
     return originalURL, true
 }
 
-func (d *DB) Save(ctx context.Context, id,originalURL string) (error) {
+func (d *DB) Save(ctx context.Context, id,originalURL string) (string, error) {
     d.mu.Lock()
     defer d.mu.Unlock()
     _, err := d.get(ctx,id)
     if err == nil {
         // строка нашлась
-        return ErrAlreadyExist
+        return "", ErrAlreadyExist
     }
     if !errors.Is(err, pgx.ErrNoRows) {
         // реальная ошибка БД
-        return err
+        return "", err
     }
-    _, err = d.db.Exec(ctx, "INSERT INTO urls (short_url,original_url) VALUES ($1,$2)",id,originalURL)
+    _, err = d.db.Exec(ctx, "INSERT INTO urls (short_url, original_url) VALUES ($1, $2)", id, originalURL)
     if err != nil {
-        return err
+        var pgErr *pgconn.PgError
+        if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+            var shortURL string
+            err2 := d.db.QueryRow(ctx, "SELECT short_url FROM urls WHERE original_url = $1", originalURL).Scan(&shortURL)
+            if err2 == nil {
+                return shortURL, ErrConflict
+            }
+            if errors.Is(err2, pgx.ErrNoRows) {
+                return "", ErrAlreadyExist
+            }
+            return "", err2
+        }
+        return "", err
     }
-    return nil
+    return "", nil
 }
 
 func (d *DB) MassiveSave(ctx context.Context, MassiveURLs []model.MassiveRequest) error {

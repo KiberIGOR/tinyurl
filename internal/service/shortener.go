@@ -8,16 +8,17 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/KiberIGOR/tinyurl/internal/repository"
 	"github.com/KiberIGOR/tinyurl/internal/model"
+	"github.com/KiberIGOR/tinyurl/internal/repository"
 )
 
 var ErrNotFound = errors.New("URL not found")
 var ErrCollision = errors.New("not found correct id for URL(collision)")
+var ErrConflict = errors.New("original URL already exists")
 
 type URLRepository interface {
 	Get(ctx context.Context, id string) (string, bool)
-	Save(ctx context.Context, id, originalURL string) error
+	Save(ctx context.Context, id, originalURL string) (string, error)
 	MassiveSave(ctx context.Context, MassiveURLs []model.MassiveRequest) error
 }
 
@@ -40,10 +41,17 @@ func (s *Shortener) Shorten(ctx context.Context,originalURL string) (string, err
 		if err != nil {
 			return "", err
 		}
-		err = s.repo.Save(ctx, id, originalURL)
-		if err !=nil {
-			if errors.Is(err,repository.ErrAlreadyExist) {
+		shortID, err := s.repo.Save(ctx, id, originalURL)
+		if err != nil {
+			if errors.Is(err, repository.ErrAlreadyExist) {
 				continue
+			}
+			if errors.Is(err, repository.ErrConflict) {
+				shortURL, err2 := url.JoinPath(s.baseURL, shortID)
+				if err2 != nil {
+					return "", err2
+				}
+				return shortURL, ErrConflict
 			}
 			return "", fmt.Errorf("failed to store the URL: %w", err)
 		}

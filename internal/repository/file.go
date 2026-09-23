@@ -59,22 +59,25 @@ func (m *FileMemory) Get(ctx context.Context, id string) (string, bool) {
 	return url, ok
 }
 
-func (m *FileMemory) Save(ctx context.Context, id, originalURL string) error {
+func (m *FileMemory) Save(ctx context.Context, id, originalURL string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if shortURL, ok := m.findByOriginal(originalURL); ok {
+		return shortURL, ErrConflict
+	}
 	if _, ok := m.get(id); ok {
-		return fmt.Errorf("%w: %q", ErrAlreadyExist, id)
+		return "", fmt.Errorf("%w: %q", ErrAlreadyExist, id)
 	}
 
 	file, err := os.OpenFile(m.fileName, os.O_RDWR, 0666)
 	if err != nil {
-		return fmt.Errorf("%w: %q", ErrOpenFile, m.fileName)
+		return "", fmt.Errorf("%w: %q", ErrOpenFile, m.fileName)
   }
 	defer file.Close()
 
 	memorybyte, err := io.ReadAll(file)
 	if err != nil {
-			return err
+			return "", err
 		}
 	var memory []model.MemoryString 
 	if len(memorybyte) == 0 {
@@ -82,7 +85,7 @@ func (m *FileMemory) Save(ctx context.Context, id, originalURL string) error {
 	}
 	err = json.Unmarshal(memorybyte, &memory)
 	if err != nil {
-			return fmt.Errorf("%w: %w", ErrParsingJSON, err)
+			return "", fmt.Errorf("%w: %w", ErrParsingJSON, err)
 	}
 	
 	memory = append(memory,model.MemoryString{
@@ -92,15 +95,15 @@ func (m *FileMemory) Save(ctx context.Context, id, originalURL string) error {
 	})
 	writebyte, err := json.Marshal(memory)
 	if err != nil {
-        return fmt.Errorf("%w: %w", ErrMakingJSON, err)
+        return "", fmt.Errorf("%w: %w", ErrMakingJSON, err)
   }
 
 	err = os.WriteFile(m.fileName, writebyte, 0666)
 	if err != nil {
-        return fmt.Errorf("%w: %w", ErrWritingJSON, err)
+        return "", fmt.Errorf("%w: %w", ErrWritingJSON, err)
   }
 	m.urls[id] = originalURL
-	return nil
+	return "", nil
 }
 
 func (m *FileMemory) MassiveSave(ctx context.Context, MassiveURLs []model.MassiveRequest) error {
@@ -149,4 +152,13 @@ func (m *FileMemory) MassiveSave(ctx context.Context, MassiveURLs []model.Massiv
 func (m *FileMemory) get(id string) (string, bool)  {
 	originalURL, ok := m.urls[id]
 	return originalURL, ok
+}
+
+func (m *FileMemory) findByOriginal(originalURL string) (string, bool) {
+	for id, url := range m.urls {
+		if url == originalURL {
+			return id, true
+		}
+	}
+	return "", false
 }

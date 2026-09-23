@@ -9,7 +9,8 @@ import (
 	"github.com/KiberIGOR/tinyurl/internal/model"
 )
 
-var ErrAlreadyExist = errors.New("URL already exist")
+var ErrAlreadyExist = errors.New("short URL already exist")
+var ErrConflict = errors.New("original URL already exists")
 type Memory struct {
 	mu   sync.RWMutex
 	urls map[string]string
@@ -28,14 +29,17 @@ func (m *Memory) Get(ctx context.Context, id string) (string, bool) {
 	return url, ok
 }
 
-func (m *Memory) Save(ctx context.Context, id, originalURL string) error {
+func (m *Memory) Save(ctx context.Context, id, originalURL string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if shortURL, ok := m.findByOriginal(originalURL); ok {
+		return shortURL, ErrConflict
+	}
 	if _, ok := m.get(id); ok {
-		return fmt.Errorf("%w: %q", ErrAlreadyExist, id)
+		return "", fmt.Errorf("%w: %q", ErrAlreadyExist, id)
 	}
 	m.urls[id] = originalURL
-	return nil
+	return "", nil
 }
 
 func (m *Memory) MassiveSave(ctx context.Context, MassiveURLs []model.MassiveRequest) error {
@@ -50,4 +54,13 @@ func (m *Memory) MassiveSave(ctx context.Context, MassiveURLs []model.MassiveReq
 func (m *Memory) get(id string) (string, bool)  {
 	originalURL, ok := m.urls[id]
 	return originalURL, ok
+}
+
+func (m *Memory) findByOriginal(originalURL string) (string, bool) {
+	for id, url := range m.urls {
+		if url == originalURL {
+			return id, true
+		}
+	}
+	return "", false
 }

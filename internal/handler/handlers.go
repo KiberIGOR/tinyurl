@@ -66,13 +66,17 @@ func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	shortURL, err := h.shortener.Shorten(ctx,string(body))
+	status := http.StatusCreated
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
-		return
+		if !errors.Is(err, service.ErrConflict) {
+			http.Error(res, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		status = http.StatusConflict
 	}
 	res.Header().Set("content-type", "text/plain")
 	res.Header().Set("content-length", strconv.Itoa(len(shortURL)))
-	res.WriteHeader(http.StatusCreated)
+	res.WriteHeader(status)
 	if _, err = res.Write([]byte(shortURL)); err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
@@ -102,9 +106,13 @@ func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request)
 		return
 	}
 	shortURL, err := h.shortener.Shorten(ctx,bodyReq.URL)
+	status := http.StatusCreated
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
-		return
+		if !errors.Is(err, service.ErrConflict) {
+			http.Error(res, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		status = http.StatusConflict
 	}
 	resp, err := json.Marshal(model.Response{URL: shortURL})
 	if err != nil {
@@ -113,7 +121,7 @@ func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request)
 	}
 	res.Header().Set("content-type", "application/json")
 	res.Header().Set("content-length", strconv.Itoa(len(resp)))
-	res.WriteHeader(http.StatusCreated)
+	res.WriteHeader(status)
 	if _, err = res.Write(resp); err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
