@@ -43,10 +43,11 @@ func main() {
 	case cfg.DataBaseDSN != "":
 		initCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		if err := runMigrations(cfg.DataBaseDSN); err != nil {
+		if err = runMigrations(cfg.DataBaseDSN); err != nil {
 			log.Fatal("migrate: ", err)
 		}
-		pool, err := newPool(initCtx, cfg.DataBaseDSN)
+		var pool *pgxpool.Pool
+		pool, err = newPool(initCtx, cfg.DataBaseDSN)
 		if err != nil {
 			log.Fatal("pool: ", err)
 		}
