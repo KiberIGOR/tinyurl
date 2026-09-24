@@ -103,7 +103,7 @@ func (m *FileMemory) Save(ctx context.Context, id, originalURL string) (string, 
 	return "", nil
 }
 
-func (m *FileMemory) MassiveSave(ctx context.Context, MassiveURLs []model.MassiveRequest) error {
+func (m *FileMemory) BatchSave(ctx context.Context, batch []model.BatchRequest) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	file, err := os.OpenFile(m.fileName, os.O_RDWR, 0666)
@@ -125,7 +125,7 @@ func (m *FileMemory) MassiveSave(ctx context.Context, MassiveURLs []model.Massiv
 			return fmt.Errorf("%w: %w", ErrParsingJSON, err)
 	}
 
-	for _,item :=range MassiveURLs {
+	for _, item := range batch {
 		memory = append(memory,model.MemoryString{
 			ID: strconv.Itoa(len(m.urls)+1),
 			ShortURL: item.ShortURL,

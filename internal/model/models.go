@@ -17,15 +17,15 @@ type MemoryString struct {
     OriginalURL string `json:"original_url"`
 } 
 
-// MassiveRequest описывает большой запрос пользователя.
-type MassiveRequest struct {
+// BatchRequest описывает элемент пакетного запроса.
+type BatchRequest struct {
     ID string `json:"correlation_id"`
     OriginalURL string `json:"original_url"`
     ShortURL string `json:"-"`
 }
 
-// MassiveResponse описывает большой ответ
-type MassiveResponse struct {
+// BatchResponse описывает элемент пакетного ответа.
+type BatchResponse struct {
     ID string `json:"correlation_id"`
     ShortURL string `json:"short_url"`
 } 

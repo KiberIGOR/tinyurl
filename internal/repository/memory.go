@@ -38,10 +38,10 @@ func (m *Memory) Save(ctx context.Context, id, originalURL string) (string, erro
 	return "", nil
 }
 
-func (m *Memory) MassiveSave(ctx context.Context, MassiveURLs []model.MassiveRequest) error {
+func (m *Memory) BatchSave(ctx context.Context, batch []model.BatchRequest) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	for _,item :=range MassiveURLs {
+	for _, item := range batch {
 		m.urls[item.ShortURL] = item.OriginalURL
 	}
 	return nil

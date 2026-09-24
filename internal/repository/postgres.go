@@ -65,7 +65,7 @@ func (d *DB) Save(ctx context.Context, id,originalURL string) (string, error) {
     return "", nil
 }
 
-func (d *DB) MassiveSave(ctx context.Context, MassiveURLs []model.MassiveRequest) error {
+func (d *DB) BatchSave(ctx context.Context, batch []model.BatchRequest) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
     tx,err := d.db.Begin(ctx)
@@ -79,8 +79,8 @@ func (d *DB) MassiveSave(ctx context.Context, MassiveURLs []model.MassiveRequest
     if err != nil {
         return err
     }
-    for _,item :=range MassiveURLs {
-		_, err := tx.Exec(ctx,stmtName, item.ShortURL, item.OriginalURL)
+    for _, item := range batch {
+		_, err := tx.Exec(ctx, stmtName, item.ShortURL, item.OriginalURL)
         if err != nil {
             return err
         }

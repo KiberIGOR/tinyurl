@@ -19,7 +19,7 @@ var ErrConflict = errors.New("original URL already exists")
 type URLRepository interface {
 	Get(ctx context.Context, id string) (string, bool)
 	Save(ctx context.Context, id, originalURL string) (string, error)
-	MassiveSave(ctx context.Context, MassiveURLs []model.MassiveRequest) error
+	BatchSave(ctx context.Context, batch []model.BatchRequest) error
 }
 
 type Shortener struct {
@@ -68,9 +68,9 @@ func (s *Shortener) Resolve(ctx context.Context,id string) (string, error) {
 	return originalURL, nil
 }
 
-func (s *Shortener) MassiveShorten(ctx context.Context, MassiveOriginalURL []model.MassiveRequest) ([]model.MassiveResponse, error) {
+func (s *Shortener) BatchShorten(ctx context.Context, batch []model.BatchRequest) ([]model.BatchResponse, error) {
 	const n int = 5
-	for i := range MassiveOriginalURL {
+	for i := range batch {
 		for j:=0; j<n; j++ {
 			//генерируем ShortURL
 			id, err := generateID()
@@ -87,7 +87,7 @@ func (s *Shortener) MassiveShorten(ctx context.Context, MassiveOriginalURL []mod
 			}
 			//проверка, что в уже сгенерированных ShortURL нет id
 			for k:=0; k<i; k++ {
-				if MassiveOriginalURL[k].ShortURL == id {
+				if batch[k].ShortURL == id {
 					if j==(n-1){
 						return nil, ErrCollision
 					}
@@ -95,22 +95,22 @@ func (s *Shortener) MassiveShorten(ctx context.Context, MassiveOriginalURL []mod
 				}
 			}
 			//записываем id
-			MassiveOriginalURL[i].ShortURL = id
+			batch[i].ShortURL = id
 			break
 		}
 	}
-	err := s.repo.MassiveSave(ctx, MassiveOriginalURL)
+	err := s.repo.BatchSave(ctx, batch)
 	if err!=nil {
 		return nil, fmt.Errorf("failed to store the URL's: %w", err)
 	}
 
-	out := make([]model.MassiveResponse, 0, len(MassiveOriginalURL))
-	for _,item := range MassiveOriginalURL {
-		result, err := url.JoinPath(s.baseURL,item.ShortURL)
+	out := make([]model.BatchResponse, 0, len(batch))
+	for _, item := range batch {
+		result, err := url.JoinPath(s.baseURL, item.ShortURL)
 		if err!=nil {
 			return nil, fmt.Errorf("failed to Join ShortURL's: %w", err)
 		}
-		out = append(out, model.MassiveResponse{
+		out = append(out, model.BatchResponse{
         ID:       item.ID,
         ShortURL: result, // полный short URL
     })

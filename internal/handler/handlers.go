@@ -16,7 +16,7 @@ import (
 type Shortener interface {
 	Shorten(ctx context.Context, originalURL string) (shortURL string, err error)
 	Resolve(ctx context.Context, id string) (originalURL string, err error)
-	MassiveShorten(ctx context.Context, MassiveOriginalURL []model.MassiveRequest) ([]model.MassiveResponse, error)
+	BatchShorten(ctx context.Context, batch []model.BatchRequest) ([]model.BatchResponse, error)
 }
 type Pinger interface {
 	Ping(ctx context.Context) error
@@ -138,7 +138,7 @@ func (h *Handler) GetPingHandler(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) PostJSONMassiveURLHandler(res http.ResponseWriter, req *http.Request) {
+func (h *Handler) PostBatchHandler(res http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
 	content := req.Header.Get("content-type")
@@ -151,7 +151,7 @@ func (h *Handler) PostJSONMassiveURLHandler(res http.ResponseWriter, req *http.R
 		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
-	var bodyReq []model.MassiveRequest
+	var bodyReq []model.BatchRequest
 	err = json.Unmarshal(body, &bodyReq)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusBadRequest)
@@ -161,7 +161,7 @@ func (h *Handler) PostJSONMassiveURLHandler(res http.ResponseWriter, req *http.R
 		http.Error(res, "URL is required", http.StatusBadRequest)
 		return
 	}
-	shortURL, err := h.shortener.MassiveShorten(ctx, bodyReq)
+	shortURL, err := h.shortener.BatchShorten(ctx, bodyReq)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return

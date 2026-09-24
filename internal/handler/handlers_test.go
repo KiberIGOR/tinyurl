@@ -269,7 +269,7 @@ func TestPostJsonUrlHandler(t *testing.T) {
 	}
 }
 
-func TestPostJSONMassiveURLHandler(t *testing.T) {
+func TestPostBatchHandler(t *testing.T) {
 	const redirect = "http://localhost:8080/"
 
 	type want struct {
@@ -340,7 +340,7 @@ func TestPostJSONMassiveURLHandler(t *testing.T) {
 			store,err := repository.NewFile("fileMemoryTest.txt")
 			require.NoError(t, err)
 			h := New(service.NewShortener(store, redirect), m)
-			h.PostJSONMassiveURLHandler(w, request)
+			h.PostBatchHandler(w, request)
 
 			res := w.Result()
 			assert.Equal(t, test.want.code, res.StatusCode)
@@ -348,8 +348,8 @@ func TestPostJSONMassiveURLHandler(t *testing.T) {
 			resBody,err :=io.ReadAll(res.Body)
 			require.NoError(t,err)
 			if test.want.code == http.StatusCreated {
-				var resp []model.MassiveResponse
-				var req []model.MassiveRequest
+				var resp []model.BatchResponse
+				var req []model.BatchRequest
 				err = json.Unmarshal(resBody, &resp)
 				require.NoError(t,err)
 				assert.True(t, strings.HasPrefix(resp[0].ShortURL, test.want.response),
