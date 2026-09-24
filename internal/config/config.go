@@ -6,10 +6,10 @@ import (
 )
 
 type Config struct {
-	Address string
-	BaseURL string
+	Address         string
+	BaseURL         string
 	FileStoragePath string
-	DataBaseDSN string
+	DataBaseDSN     string
 }
 
 func Parse() *Config {
@@ -23,20 +23,20 @@ func Parse() *Config {
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("SERVER_ADDRESS"); envRunAddr != "" {
-        cfg.Address = envRunAddr
-  }
+		cfg.Address = envRunAddr
+	}
 
 	if envRunAddr := os.Getenv("BASE_URL"); envRunAddr != "" {
-        cfg.BaseURL = envRunAddr
-  }
+		cfg.BaseURL = envRunAddr
+	}
 
 	if envRunAddr := os.Getenv("FILE_STORAGE_PATH"); envRunAddr != "" {
-        cfg.FileStoragePath = envRunAddr
-  }
+		cfg.FileStoragePath = envRunAddr
+	}
 
 	if envRunAddr := os.Getenv("DATABASE_DSN"); envRunAddr != "" {
-        cfg.DataBaseDSN = envRunAddr
-  }
+		cfg.DataBaseDSN = envRunAddr
+	}
 
 	return cfg
 }

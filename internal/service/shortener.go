@@ -34,9 +34,9 @@ func NewShortener(repo URLRepository, baseURL string) *Shortener {
 	}
 }
 
-func (s *Shortener) Shorten(ctx context.Context,originalURL string) (string, error) {
+func (s *Shortener) Shorten(ctx context.Context, originalURL string) (string, error) {
 	const n int = 5
-	for i:=0; i<n; i++ {
+	for i := 0; i < n; i++ {
 		id, err := generateID()
 		if err != nil {
 			return "", err
@@ -60,7 +60,7 @@ func (s *Shortener) Shorten(ctx context.Context,originalURL string) (string, err
 	return "", ErrCollision
 }
 
-func (s *Shortener) Resolve(ctx context.Context,id string) (string, error) {
+func (s *Shortener) Resolve(ctx context.Context, id string) (string, error) {
 	originalURL, ok := s.repo.Get(ctx, id)
 	if !ok {
 		return "", ErrNotFound
@@ -71,7 +71,7 @@ func (s *Shortener) Resolve(ctx context.Context,id string) (string, error) {
 func (s *Shortener) BatchShorten(ctx context.Context, batch []model.BatchRequest) ([]model.BatchResponse, error) {
 	const n int = 5
 	for i := range batch {
-		for j:=0; j<n; j++ {
+		for j := 0; j < n; j++ {
 			//генерируем ShortURL
 			id, err := generateID()
 			if err != nil {
@@ -80,15 +80,15 @@ func (s *Shortener) BatchShorten(ctx context.Context, batch []model.BatchRequest
 			//проверка, что в store нет подобных id
 			_, ok := s.repo.Get(ctx, id)
 			if ok {
-				if j==(n-1){
-						return nil, ErrCollision
+				if j == (n - 1) {
+					return nil, ErrCollision
 				}
 				continue
 			}
 			//проверка, что в уже сгенерированных ShortURL нет id
-			for k:=0; k<i; k++ {
+			for k := 0; k < i; k++ {
 				if batch[k].ShortURL == id {
-					if j==(n-1){
+					if j == (n - 1) {
 						return nil, ErrCollision
 					}
 					continue
@@ -100,20 +100,20 @@ func (s *Shortener) BatchShorten(ctx context.Context, batch []model.BatchRequest
 		}
 	}
 	err := s.repo.BatchSave(ctx, batch)
-	if err!=nil {
+	if err != nil {
 		return nil, fmt.Errorf("failed to store the URL's: %w", err)
 	}
 
 	out := make([]model.BatchResponse, 0, len(batch))
 	for _, item := range batch {
 		result, err := url.JoinPath(s.baseURL, item.ShortURL)
-		if err!=nil {
+		if err != nil {
 			return nil, fmt.Errorf("failed to Join ShortURL's: %w", err)
 		}
 		out = append(out, model.BatchResponse{
-        ID:       item.ID,
-        ShortURL: result, // полный short URL
-    })
+			ID:       item.ID,
+			ShortURL: result, // полный short URL
+		})
 	}
 	return out, nil
 }
@@ -125,4 +125,3 @@ func generateID() (string, error) {
 	}
 	return base64.URLEncoding.EncodeToString(b)[:8], nil
 }
-

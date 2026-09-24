@@ -10,6 +10,7 @@ import (
 )
 
 var ErrAlreadyExist = errors.New("short URL already exist")
+
 type Memory struct {
 	mu   sync.RWMutex
 	urls map[string]string
@@ -47,7 +48,7 @@ func (m *Memory) BatchSave(ctx context.Context, batch []model.BatchRequest) erro
 	return nil
 }
 
-func (m *Memory) get(id string) (string, bool)  {
+func (m *Memory) get(id string) (string, bool) {
 	originalURL, ok := m.urls[id]
 	return originalURL, ok
 }

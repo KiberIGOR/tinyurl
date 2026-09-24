@@ -24,7 +24,7 @@ type Pinger interface {
 
 type Handler struct {
 	shortener Shortener
-	pinger Pinger
+	pinger    Pinger
 }
 
 func New(shortener Shortener, pinger Pinger) *Handler {
@@ -65,7 +65,7 @@ func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "URL is required", http.StatusBadRequest)
 		return
 	}
-	shortURL, err := h.shortener.Shorten(ctx,string(body))
+	shortURL, err := h.shortener.Shorten(ctx, string(body))
 	status := http.StatusCreated
 	if err != nil {
 		if !errors.Is(err, service.ErrConflict) {
@@ -105,7 +105,7 @@ func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request)
 		http.Error(res, "URL is required", http.StatusBadRequest)
 		return
 	}
-	shortURL, err := h.shortener.Shorten(ctx,bodyReq.URL)
+	shortURL, err := h.shortener.Shorten(ctx, bodyReq.URL)
 	status := http.StatusCreated
 	if err != nil {
 		if !errors.Is(err, service.ErrConflict) {
@@ -131,7 +131,7 @@ func (h *Handler) GetPingHandler(res http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
 
-	if err := h.pinger.Ping(ctx); err !=nil {
+	if err := h.pinger.Ping(ctx); err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
