@@ -19,7 +19,7 @@ var ErrConflict = errors.New("original URL already exists")
 type URLRepository interface {
 	Get(ctx context.Context, id string) (string, bool)
 	Save(ctx context.Context, id, originalURL string) (string, error)
-	BatchSave(ctx context.Context, entries []repository.URLEntry) error
+	BatchSave(ctx context.Context, entries []repository.URLEntry) (repository.BatchSaveResult, error)
 }
 
 type Shortener struct {
@@ -69,67 +69,65 @@ func (s *Shortener) Resolve(ctx context.Context, id string) (string, error) {
 }
 
 func (s *Shortener) BatchShorten(ctx context.Context, batch []model.BatchRequest) ([]model.BatchResponse, error) {
-	const n int = 5
-	byOriginal := make(map[string]string, len(batch))
-	shortIDs := make([]string, len(batch))
+	const maxAttempts = 5
 
+	byOriginal := make(map[string]string, len(batch))
 	for i := range batch {
-		if id, ok := byOriginal[batch[i].OriginalURL]; ok {
-			shortIDs[i] = id
+		if _, ok := byOriginal[batch[i].OriginalURL]; ok {
 			continue
 		}
+		id, err := generateID()
+		if err != nil {
+			return nil, err
+		}
+		byOriginal[batch[i].OriginalURL] = id
+	}
 
-		for j := 0; j < n; j++ {
+	pending := make([]repository.URLEntry, 0, len(byOriginal))
+	for originalURL, shortID := range byOriginal {
+		pending = append(pending, repository.URLEntry{
+			ShortURL:    shortID,
+			OriginalURL: originalURL,
+		})
+	}
+
+	for attempt := 0; len(pending) > 0 && attempt < maxAttempts; attempt++ {
+		result, err := s.repo.BatchSave(ctx, pending)
+		if err != nil {
+			return nil, fmt.Errorf("failed to store the URL's: %w", err)
+		}
+
+		for originalURL, shortID := range result.Existing {
+			byOriginal[originalURL] = shortID
+		}
+
+		if len(result.Retries) == 0 {
+			pending = nil
+			break
+		}
+
+		pending = pending[:0]
+		for _, item := range result.Retries {
 			id, err := generateID()
 			if err != nil {
 				return nil, err
 			}
-			if _, ok := s.repo.Get(ctx, id); ok {
-				if j == n-1 {
-					return nil, ErrCollision
-				}
-				continue
-			}
-			collision := false
-			for _, existing := range byOriginal {
-				if existing == id {
-					collision = true
-					break
-				}
-			}
-			if collision {
-				if j == n-1 {
-					return nil, ErrCollision
-				}
-				continue
-			}
-			shortIDs[i] = id
-			byOriginal[batch[i].OriginalURL] = id
-			break
+			byOriginal[item.OriginalURL] = id
+			pending = append(pending, repository.URLEntry{
+				ShortURL:    id,
+				OriginalURL: item.OriginalURL,
+			})
 		}
 	}
 
-	toSave := make([]repository.URLEntry, 0, len(byOriginal))
-	seen := make(map[string]struct{}, len(byOriginal))
-	for i, item := range batch {
-		if _, ok := seen[shortIDs[i]]; ok {
-			continue
-		}
-		seen[shortIDs[i]] = struct{}{}
-		toSave = append(toSave, repository.URLEntry{
-			ShortURL:    shortIDs[i],
-			OriginalURL: item.OriginalURL,
-		})
-	}
-
-	err := s.repo.BatchSave(ctx, toSave)
-	if err != nil {
-		return nil, fmt.Errorf("failed to store the URL's: %w", err)
+	if len(pending) > 0 {
+		return nil, ErrCollision
 	}
 
 	out := make([]model.BatchResponse, 0, len(batch))
-	for i, item := range batch {
-		result, err := url.JoinPath(s.baseURL, shortIDs[i])
+	for _, item := range batch {
+		shortID := byOriginal[item.OriginalURL]
+		result, err := url.JoinPath(s.baseURL, shortID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to Join ShortURL's: %w", err)
 		}

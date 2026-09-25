@@ -28,3 +28,5 @@
 {"uuid":"28","short_url":"BpbkJ-VC","original_url":"https://practicum.yandex.ru/"}
 {"uuid":"29","short_url":"ziN0tUTd","original_url":"https://practicum.yandex.ru"}
 {"uuid":"30","short_url":"w0iL8sOt","original_url":"https://practicum.yandex.ru"}
+{"uuid":"31","short_url":"MxF2BDos","original_url":"https://practicum.yandex.ru/"}
+{"uuid":"32","short_url":"bazFjjQi","original_url":"https://practicum.yandex.ru"}

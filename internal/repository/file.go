@@ -161,26 +161,49 @@ func (m *FileMemory) Save(ctx context.Context, id, originalURL string) (string, 
 	return "", nil
 }
 
-func (m *FileMemory) BatchSave(ctx context.Context, entries []URLEntry) error {
+func (m *FileMemory) BatchSave(ctx context.Context, entries []URLEntry) (BatchSaveResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	result := BatchSaveResult{
+		Existing: make(map[string]string),
+	}
+
 	for _, item := range entries {
+		if shortURL, ok := m.findByOriginal(item.OriginalURL); ok {
+			result.Existing[item.OriginalURL] = shortURL
+			continue
+		}
+		if _, ok := m.get(item.ShortURL); ok {
+			result.Retries = append(result.Retries, item)
+			continue
+		}
+
 		record := model.MemoryString{
 			ID:          strconv.Itoa(m.nextID),
 			ShortURL:    item.ShortURL,
 			OriginalURL: item.OriginalURL,
 		}
 		if err := m.enc.Encode(record); err != nil {
-			return fmt.Errorf("%w: %w", ErrWritingJSON, err)
+			return result, fmt.Errorf("%w: %w", ErrWritingJSON, err)
 		}
 		m.nextID++
 		m.urls[item.ShortURL] = item.OriginalURL
 	}
-	return nil
+
+	return result, nil
 }
 
 func (m *FileMemory) get(id string) (string, bool) {
 	originalURL, ok := m.urls[id]
 	return originalURL, ok
+}
+
+func (m *FileMemory) findByOriginal(originalURL string) (string, bool) {
+	for shortURL, url := range m.urls {
+		if url == originalURL {
+			return shortURL, true
+		}
+	}
+	return "", false
 }
