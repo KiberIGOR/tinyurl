@@ -1,0 +1,1 @@
+[{"uuid":"1","short_url":"iB2Ke-rX","original_url":"https://practicum.yandex.ru"},{"uuid":"2","short_url":"Eq5vaym9","original_url":"https://practicum.yandex.ru"},{"uuid":"3","short_url":"bg4oId4K","original_url":"https://practicum.yandex.ru"},{"uuid":"4","short_url":"TBD1E58X","original_url":"https://practicum.yandex.ru"}]
