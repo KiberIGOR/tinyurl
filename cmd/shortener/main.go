@@ -56,10 +56,13 @@ func main() {
 		store = pg
 		pinger = pg
 	case cfg.FileStoragePath != "":
-		store, err = repository.NewFile(cfg.FileStoragePath)
+		var fileStore *repository.FileMemory
+		fileStore, err = repository.NewFile(cfg.FileStoragePath)
 		if err != nil {
 			log.Fatal(err)
 		}
+		defer fileStore.Close()
+		store = fileStore
 		pinger = nilPinger{}
 	default:
 		store = repository.NewMemory()
