@@ -161,11 +161,11 @@ func (m *FileMemory) Save(ctx context.Context, id, originalURL string) (string, 
 	return "", nil
 }
 
-func (m *FileMemory) BatchSave(ctx context.Context, batch []model.BatchRequest) error {
+func (m *FileMemory) BatchSave(ctx context.Context, entries []URLEntry) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for _, item := range batch {
+	for _, item := range entries {
 		record := model.MemoryString{
 			ID:          strconv.Itoa(m.nextID),
 			ShortURL:    item.ShortURL,

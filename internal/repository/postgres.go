@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/KiberIGOR/tinyurl/internal/model"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -12,9 +11,13 @@ import (
 )
 
 var ErrConflict = errors.New("original URL already exists")
-
 type DB struct {
 	db *pgxpool.Pool
+}
+// URLEntry — пара short_url / original_url для пакетной записи в хранилище.
+type URLEntry struct {
+	ShortURL    string
+	OriginalURL string
 }
 
 func NewDB(db *pgxpool.Pool) *DB {
@@ -54,7 +57,7 @@ func (d *DB) Save(ctx context.Context, id, originalURL string) (string, error) {
 	return "", err2
 }
 
-func (d *DB) BatchSave(ctx context.Context, batch []model.BatchRequest) error {
+func (d *DB) BatchSave(ctx context.Context, entries []URLEntry) error {
 	tx, err := d.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -66,7 +69,7 @@ func (d *DB) BatchSave(ctx context.Context, batch []model.BatchRequest) error {
 	if err != nil {
 		return err
 	}
-	for _, item := range batch {
+	for _, item := range entries {
 		if _, err := tx.Exec(ctx, stmtName, item.ShortURL, item.OriginalURL); err != nil {
 			return err
 		}

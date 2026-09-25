@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/KiberIGOR/tinyurl/internal/model"
 )
 
 var ErrAlreadyExist = errors.New("short URL already exist")
@@ -39,10 +38,10 @@ func (m *Memory) Save(ctx context.Context, id, originalURL string) (string, erro
 	return "", nil
 }
 
-func (m *Memory) BatchSave(ctx context.Context, batch []model.BatchRequest) error {
+func (m *Memory) BatchSave(ctx context.Context, entries []URLEntry) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	for _, item := range batch {
+	for _, item := range entries {
 		m.urls[item.ShortURL] = item.OriginalURL
 	}
 	return nil

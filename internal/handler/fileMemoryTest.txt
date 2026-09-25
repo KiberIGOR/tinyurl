@@ -22,3 +22,6 @@
 {"uuid":"22","short_url":"vfH_kzKv","original_url":"https://practicum.yandex.ru/"}
 {"uuid":"23","short_url":"Yy0pyL9D","original_url":"https://practicum.yandex.ru"}
 {"uuid":"24","short_url":"akHgBB_S","original_url":"https://practicum.yandex.ru"}
+{"uuid":"25","short_url":"KX-_crr0","original_url":"https://practicum.yandex.ru/"}
+{"uuid":"26","short_url":"VopWSUAr","original_url":"https://practicum.yandex.ru"}
+{"uuid":"27","short_url":"xnMq4cPk","original_url":"https://practicum.yandex.ru"}

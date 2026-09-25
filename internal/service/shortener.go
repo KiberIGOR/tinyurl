@@ -19,7 +19,7 @@ var ErrConflict = errors.New("original URL already exists")
 type URLRepository interface {
 	Get(ctx context.Context, id string) (string, bool)
 	Save(ctx context.Context, id, originalURL string) (string, error)
-	BatchSave(ctx context.Context, batch []model.BatchRequest) error
+	BatchSave(ctx context.Context, entries []repository.URLEntry) error
 }
 
 type Shortener struct {
@@ -71,10 +71,11 @@ func (s *Shortener) Resolve(ctx context.Context, id string) (string, error) {
 func (s *Shortener) BatchShorten(ctx context.Context, batch []model.BatchRequest) ([]model.BatchResponse, error) {
 	const n int = 5
 	byOriginal := make(map[string]string, len(batch))
+	shortIDs := make([]string, len(batch))
 
 	for i := range batch {
 		if id, ok := byOriginal[batch[i].OriginalURL]; ok {
-			batch[i].ShortURL = id
+			shortIDs[i] = id
 			continue
 		}
 
@@ -102,20 +103,23 @@ func (s *Shortener) BatchShorten(ctx context.Context, batch []model.BatchRequest
 				}
 				continue
 			}
-			batch[i].ShortURL = id
+			shortIDs[i] = id
 			byOriginal[batch[i].OriginalURL] = id
 			break
 		}
 	}
 
-	toSave := make([]model.BatchRequest, 0, len(byOriginal))
+	toSave := make([]repository.URLEntry, 0, len(byOriginal))
 	seen := make(map[string]struct{}, len(byOriginal))
-	for _, item := range batch {
-		if _, ok := seen[item.ShortURL]; ok {
+	for i, item := range batch {
+		if _, ok := seen[shortIDs[i]]; ok {
 			continue
 		}
-		seen[item.ShortURL] = struct{}{}
-		toSave = append(toSave, item)
+		seen[shortIDs[i]] = struct{}{}
+		toSave = append(toSave, repository.URLEntry{
+			ShortURL:    shortIDs[i],
+			OriginalURL: item.OriginalURL,
+		})
 	}
 
 	err := s.repo.BatchSave(ctx, toSave)
@@ -124,14 +128,14 @@ func (s *Shortener) BatchShorten(ctx context.Context, batch []model.BatchRequest
 	}
 
 	out := make([]model.BatchResponse, 0, len(batch))
-	for _, item := range batch {
-		result, err := url.JoinPath(s.baseURL, item.ShortURL)
+	for i, item := range batch {
+		result, err := url.JoinPath(s.baseURL, shortIDs[i])
 		if err != nil {
 			return nil, fmt.Errorf("failed to Join ShortURL's: %w", err)
 		}
 		out = append(out, model.BatchResponse{
 			ID:       item.ID,
-			ShortURL: result, // полный short URL
+			ShortURL: result,
 		})
 	}
 	return out, nil
