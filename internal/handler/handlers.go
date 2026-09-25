@@ -9,9 +9,21 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/KiberIGOR/tinyurl/internal/logger"
 	"github.com/KiberIGOR/tinyurl/internal/model"
 	"github.com/KiberIGOR/tinyurl/internal/service"
+	"go.uber.org/zap"
 )
+
+func respondInternalError(res http.ResponseWriter, err error) {
+	logger.Log.Error("internal server error", zap.Error(err))
+	http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+}
+
+func respondBadRequest(res http.ResponseWriter, err error) {
+	logger.Log.Error("bad request", zap.Error(err))
+	http.Error(res, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+}
 
 type Shortener interface {
 	Shorten(ctx context.Context, originalURL string) (shortURL string, err error)
@@ -41,7 +53,7 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 			http.Error(res, "URL not found", http.StatusBadRequest)
 			return
 		}
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+		respondInternalError(res, err)
 		return
 	}
 	res.Header().Set("Location", originalURL)
@@ -58,7 +70,7 @@ func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 	}
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusBadRequest)
+		respondBadRequest(res, err)
 		return
 	}
 	if len(body) == 0 {
@@ -69,7 +81,7 @@ func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 	status := http.StatusCreated
 	if err != nil {
 		if !errors.Is(err, service.ErrConflict) {
-			http.Error(res, err.Error(), http.StatusInternalServerError)
+			respondInternalError(res, err)
 			return
 		}
 		status = http.StatusConflict
@@ -92,7 +104,7 @@ func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request)
 	}
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusBadRequest)
+		respondBadRequest(res, err)
 		return
 	}
 	var bodyReq model.Request
@@ -109,14 +121,14 @@ func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request)
 	status := http.StatusCreated
 	if err != nil {
 		if !errors.Is(err, service.ErrConflict) {
-			http.Error(res, err.Error(), http.StatusInternalServerError)
+			respondInternalError(res, err)
 			return
 		}
 		status = http.StatusConflict
 	}
 	resp, err := json.Marshal(model.Response{URL: shortURL})
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+		respondInternalError(res, err)
 		return
 	}
 	res.Header().Set("content-type", "application/json")
@@ -132,7 +144,7 @@ func (h *Handler) GetPingHandler(res http.ResponseWriter, req *http.Request) {
 	defer cancel()
 
 	if err := h.pinger.Ping(ctx); err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+		respondInternalError(res, err)
 		return
 	}
 	res.WriteHeader(http.StatusOK)
@@ -148,7 +160,7 @@ func (h *Handler) PostBatchHandler(res http.ResponseWriter, req *http.Request) {
 	}
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusBadRequest)
+		respondBadRequest(res, err)
 		return
 	}
 	var bodyReq []model.BatchRequest
@@ -163,12 +175,12 @@ func (h *Handler) PostBatchHandler(res http.ResponseWriter, req *http.Request) {
 	}
 	shortURL, err := h.shortener.BatchShorten(ctx, bodyReq)
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+		respondInternalError(res, err)
 		return
 	}
 	resp, err := json.Marshal(shortURL)
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
+		respondInternalError(res, err)
 		return
 	}
 	res.Header().Set("content-type", "application/json")
