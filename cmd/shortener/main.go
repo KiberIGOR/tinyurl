@@ -8,6 +8,7 @@ import (
 
 	"log"
 
+	"github.com/KiberIGOR/tinyurl/internal/auth"
 	"github.com/KiberIGOR/tinyurl/internal/compress"
 	"github.com/KiberIGOR/tinyurl/internal/config"
 	"github.com/KiberIGOR/tinyurl/internal/handler"
@@ -37,6 +38,7 @@ func main() {
 		log.Fatal(err)
 	}
 	var store service.URLRepository
+	var userRepo service.UserRepository
 	var pinger handler.Pinger
 	var err error
 	switch {
@@ -54,6 +56,7 @@ func main() {
 		defer pool.Close()
 		pg := repository.NewDB(pool)
 		store = pg
+		userRepo = pg
 		pinger = pg
 	case cfg.FileStoragePath != "":
 		var fileStore *repository.FileMemory
@@ -63,23 +66,32 @@ func main() {
 		}
 		defer fileStore.Close()
 		store = fileStore
+		userRepo = fileStore
 		pinger = nilPinger{}
 	default:
-		store = repository.NewMemory()
+		memory := repository.NewMemory()
+		store = memory
+		userRepo = memory
 		pinger = nilPinger{}
 	}
 	svc := service.NewShortener(store, cfg.BaseURL)
 	h := handler.New(svc, pinger)
 
+	auth.Initialize(service.NewAuthService(userRepo, cfg.SecretKey))
+	
 	r := chi.NewRouter()
 	r.Use(logger.RequestLogger)
 	r.Use(compress.GzipMiddleware)
 
-	r.Post("/", h.PostURLHandler)
-	r.Post("/api/shorten", h.PostJSONURLHandler)
-	r.Post("/api/shorten/batch", h.PostBatchHandler)
-	r.Get("/ping", h.GetPingHandler)
-	r.Get("/{id}", h.GetURL)
+	r.Group(func(r chi.Router) {
+		r.Use(auth.SetCookieMiddleware)
+		r.Post("/", h.PostURLHandler)
+		r.Post("/api/shorten", h.PostJSONURLHandler)
+		r.Post("/api/shorten/batch", h.PostBatchHandler)
+		r.Get("/ping", h.GetPingHandler)
+		r.Get("/{id}", h.GetURL)
+	})
+	r.With(auth.AuthMiddleware).Get("/api/user/urls", h.GetUsersURLs)
 	err = http.ListenAndServe(cfg.Address, r)
 	if err != nil {
 		log.Fatal(err)
