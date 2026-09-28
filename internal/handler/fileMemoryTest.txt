@@ -1,5 +1,0 @@
-{"uuid":"1","short_url":"EwHXdJfB","original_url":"https://practicum.yandex.ru/","user_id":"294143"}
-{"uuid":"2","short_url":"6YFVOEu3","original_url":"https://practicum.yandex.ru/","user_id":"145557"}
-{"uuid":"3","short_url":"yIVxuTFu","original_url":"https://practicum.yandex.ru","user_id":"648478"}
-{"uuid":"4","short_url":"YzCT0cBm","original_url":"https://practicum.yandex.ru/","user_id":"618065"}
-{"uuid":"5","short_url":"v8GBmdYT","original_url":"https://practicum.yandex.ru","user_id":"754313"}

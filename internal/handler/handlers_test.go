@@ -400,3 +400,98 @@ func TestPostBatchHandler(t *testing.T) {
 		})
 	}
 }
+
+func TestGetUsersURLs(t *testing.T) {
+	const redirect = "http://localhost:8080/"
+
+	type want struct {
+		code        int
+		responseShort    string
+		responseOriginal    string
+		contentType string
+	}
+	tests := []struct {
+		name        string
+		want        want
+		method      string
+		userID        int
+	}{
+		{
+			name: "positive test #1",
+			want: want{
+				code:        200,
+				responseShort:    "EwHXdJfT",
+				responseOriginal:    "https://practicum.yandex.ru",
+				contentType: "application/json",
+			},
+			method:      http.MethodGet,
+			userID: 1,
+		},
+		{
+			name: "positive test #2",
+			want: want{
+				code:        204,
+				responseShort:    "EwHXdJfT",
+				responseOriginal:    "https://practicum.yandex.ru",
+				contentType: "application/json",
+			},
+			method:      http.MethodGet,
+			userID: 246,
+		},
+		{
+			name: "negative test #1",
+			want: want{
+				code:        401,
+				responseShort:    "EwHXdJfT",
+				responseOriginal:    "https://practicum.yandex.ru",
+				contentType: "application/json",
+			},
+			method:      http.MethodGet,
+			userID: -1,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			userID := test.userID
+			request := httptest.NewRequest(test.method, "/api/user/urls", nil)
+			request = requestWithUserID(request, userID)
+
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			m := mocks.NewMockPinger(ctrl)
+
+			w := httptest.NewRecorder()
+			store, err := repository.NewFile("fileMemoryTest.txt")
+			require.NoError(t, err)
+			defer store.Close()
+			if test.want.code == http.StatusOK {
+				if _, ok := store.Get(context.Background(), test.want.responseShort); !ok {
+					_, err = store.Save(context.Background(), test.want.responseShort, test.want.responseOriginal, userID)
+					require.NoError(t, err)
+				}
+			}
+			h := New(service.NewShortener(store, redirect), m)
+			h.GetUsersURLs(w, request)
+
+			res := w.Result()
+			assert.Equal(t, test.want.code, res.StatusCode)
+			defer res.Body.Close()
+
+			resBody, err := io.ReadAll(res.Body)
+			require.NoError(t, err)
+			
+			if test.want.code == http.StatusOK {
+				var resp []model.UserResponse
+				err = json.Unmarshal(resBody, &resp)
+				require.NoError(t, err)
+				assert.True(t, strings.HasPrefix(resp[0].ShortURL, redirect),
+					"response body should start with %q, got %q", redirect, resp[0].ShortURL)
+				id := strings.TrimPrefix(resp[0].ShortURL, redirect)
+				assert.NotEmpty(t, id)
+				assert.Equal(t,id, test.want.responseShort)
+				assert.Equal(t,resp[0].OriginalURL, test.want.responseOriginal)
+				assert.Equal(t, test.want.contentType, res.Header.Get("content-type"))
+			}
+		})
+	}
+}
