@@ -67,8 +67,8 @@ func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 	defer cancel()
 	userID, ok := req.Context().Value(auth.KeyUserID).(int)
 	if !ok {
-			respondInternalError(res, errors.New("PostURLHandler error: no user id"))
-			return
+		respondInternalError(res, errors.New("PostURLHandler error: no user id"))
+		return
 	}
 	content := req.Header.Get("content-type")
 	if content != "text/plain" && content != "text/plain;charset=UTF-8" {
@@ -84,7 +84,7 @@ func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "URL is required", http.StatusBadRequest)
 		return
 	}
-	shortURL, err := h.shortener.Shorten(ctx, string(body),userID)
+	shortURL, err := h.shortener.Shorten(ctx, string(body), userID)
 	status := http.StatusCreated
 	if err != nil {
 		if !errors.Is(err, service.ErrConflict) {
@@ -106,8 +106,8 @@ func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request)
 	defer cancel()
 	userID, ok := req.Context().Value(auth.KeyUserID).(int)
 	if !ok {
-			respondInternalError(res, errors.New("PostJSONURLHandler error: no user id"))
-			return
+		respondInternalError(res, errors.New("PostJSONURLHandler error: no user id"))
+		return
 	}
 	content := req.Header.Get("content-type")
 	if content != "application/json" {
@@ -167,8 +167,8 @@ func (h *Handler) PostBatchHandler(res http.ResponseWriter, req *http.Request) {
 	defer cancel()
 	userID, ok := req.Context().Value(auth.KeyUserID).(int)
 	if !ok {
-			respondInternalError(res, errors.New("PostBatchHandler error: no user id"))
-			return
+		respondInternalError(res, errors.New("PostBatchHandler error: no user id"))
+		return
 	}
 	content := req.Header.Get("content-type")
 	if content != "application/json" {

@@ -78,7 +78,7 @@ func main() {
 	h := handler.New(svc, pinger)
 
 	auth.Initialize(service.NewAuthService(userRepo, cfg.SecretKey))
-	
+
 	r := chi.NewRouter()
 	r.Use(logger.RequestLogger)
 	r.Use(compress.GzipMiddleware)

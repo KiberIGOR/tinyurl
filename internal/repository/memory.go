@@ -66,13 +66,13 @@ func (m *Memory) BatchSave(ctx context.Context, entries []URLEntry, userID int) 
 	return result, nil
 }
 
-func (m *Memory) GetURLsByUserID(ctx context.Context, userID int) ([]URLEntry,error) {
+func (m *Memory) GetURLsByUserID(ctx context.Context, userID int) ([]URLEntry, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	shorts := m.byUser[userID]
-	if len(shorts)==0 {
-		return nil, ErrNoContent 
+	if len(shorts) == 0 {
+		return nil, ErrNoContent
 	}
 	result := make([]URLEntry, 0, len(shorts))
 	for _, short := range shorts {

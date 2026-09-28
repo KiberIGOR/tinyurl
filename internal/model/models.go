@@ -32,6 +32,5 @@ type BatchResponse struct {
 
 type UserResponse struct {
 	OriginalURL string `json:"original_url"`
-	ShortURL string `json:"short_url"`
+	ShortURL    string `json:"short_url"`
 }
-

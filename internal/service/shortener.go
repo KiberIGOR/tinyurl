@@ -21,7 +21,7 @@ type URLRepository interface {
 	Get(ctx context.Context, id string) (string, bool)
 	Save(ctx context.Context, id, originalURL string, userID int) (string, error)
 	BatchSave(ctx context.Context, entries []repository.URLEntry, userID int) (repository.BatchSaveResult, error)
-	GetURLsByUserID(ctx context.Context, userID int) ([]repository.URLEntry,error)
+	GetURLsByUserID(ctx context.Context, userID int) ([]repository.URLEntry, error)
 }
 
 type Shortener struct {
@@ -151,7 +151,7 @@ func generateID() (string, error) {
 
 func (s *Shortener) ResolveByUserID(ctx context.Context, userID int) ([]model.UserResponse, error) {
 	urls, err := s.repo.GetURLsByUserID(ctx, userID)
-	if err!=nil {
+	if err != nil {
 		if errors.Is(err, repository.ErrNoContent) {
 			return nil, ErrNoContent
 		}
@@ -165,7 +165,7 @@ func (s *Shortener) ResolveByUserID(ctx context.Context, userID int) ([]model.Us
 		}
 		out = append(out, model.UserResponse{
 			OriginalURL: item.OriginalURL,
-			ShortURL: result,
+			ShortURL:    result,
 		})
 	}
 	return out, nil

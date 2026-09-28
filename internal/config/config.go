@@ -10,7 +10,7 @@ type Config struct {
 	BaseURL         string
 	FileStoragePath string
 	DataBaseDSN     string
-	SecretKey 			string
+	SecretKey       string
 }
 
 func Parse() *Config {
