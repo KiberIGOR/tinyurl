@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/KiberIGOR/tinyurl/internal/auth"
 	"github.com/KiberIGOR/tinyurl/internal/logger"
 	"github.com/KiberIGOR/tinyurl/internal/model"
 	"github.com/KiberIGOR/tinyurl/internal/service"
@@ -26,9 +27,10 @@ func respondBadRequest(res http.ResponseWriter, err error) {
 }
 
 type Shortener interface {
-	Shorten(ctx context.Context, originalURL string) (shortURL string, err error)
+	Shorten(ctx context.Context, originalURL string, userID int) (shortURL string, err error)
 	Resolve(ctx context.Context, id string) (originalURL string, err error)
-	BatchShorten(ctx context.Context, batch []model.BatchRequest) ([]model.BatchResponse, error)
+	BatchShorten(ctx context.Context, batch []model.BatchRequest, userID int) ([]model.BatchResponse, error)
+	ResolveByUserID(ctx context.Context, userID int) ([]model.UserResponse, error)
 }
 type Pinger interface {
 	Ping(ctx context.Context) error
@@ -63,6 +65,11 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
+	userID, ok := req.Context().Value(auth.KeyUserID).(int)
+	if !ok {
+		respondInternalError(res, errors.New("PostURLHandler error: no user id"))
+		return
+	}
 	content := req.Header.Get("content-type")
 	if content != "text/plain" && content != "text/plain;charset=UTF-8" {
 		http.Error(res, "Only content-type: text/plain are allowed!", http.StatusBadRequest)
@@ -77,7 +84,7 @@ func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "URL is required", http.StatusBadRequest)
 		return
 	}
-	shortURL, err := h.shortener.Shorten(ctx, string(body))
+	shortURL, err := h.shortener.Shorten(ctx, string(body), userID)
 	status := http.StatusCreated
 	if err != nil {
 		if !errors.Is(err, service.ErrConflict) {
@@ -97,6 +104,11 @@ func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
+	userID, ok := req.Context().Value(auth.KeyUserID).(int)
+	if !ok {
+		respondInternalError(res, errors.New("PostJSONURLHandler error: no user id"))
+		return
+	}
 	content := req.Header.Get("content-type")
 	if content != "application/json" {
 		http.Error(res, "Only content-type: application/json are allowed!", http.StatusBadRequest)
@@ -117,7 +129,7 @@ func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request)
 		http.Error(res, "URL is required", http.StatusBadRequest)
 		return
 	}
-	shortURL, err := h.shortener.Shorten(ctx, bodyReq.URL)
+	shortURL, err := h.shortener.Shorten(ctx, bodyReq.URL, userID)
 	status := http.StatusCreated
 	if err != nil {
 		if !errors.Is(err, service.ErrConflict) {
@@ -153,6 +165,11 @@ func (h *Handler) GetPingHandler(res http.ResponseWriter, req *http.Request) {
 func (h *Handler) PostBatchHandler(res http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
+	userID, ok := req.Context().Value(auth.KeyUserID).(int)
+	if !ok {
+		respondInternalError(res, errors.New("PostBatchHandler error: no user id"))
+		return
+	}
 	content := req.Header.Get("content-type")
 	if content != "application/json" {
 		http.Error(res, "Only content-type: application/json are allowed!", http.StatusBadRequest)
@@ -173,7 +190,7 @@ func (h *Handler) PostBatchHandler(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "URL is required", http.StatusBadRequest)
 		return
 	}
-	shortURL, err := h.shortener.BatchShorten(ctx, bodyReq)
+	shortURL, err := h.shortener.BatchShorten(ctx, bodyReq, userID)
 	if err != nil {
 		respondInternalError(res, err)
 		return
@@ -187,6 +204,36 @@ func (h *Handler) PostBatchHandler(res http.ResponseWriter, req *http.Request) {
 	res.Header().Set("content-length", strconv.Itoa(len(resp)))
 	res.WriteHeader(http.StatusCreated)
 	if _, err = res.Write(resp); err != nil {
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}
+}
+
+func (h *Handler) GetUsersURLs(res http.ResponseWriter, req *http.Request) {
+	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
+	defer cancel()
+	userID, ok := req.Context().Value(auth.KeyUserID).(int)
+	if !ok || userID <= 0 {
+		http.Error(res, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+	urls, err := h.shortener.ResolveByUserID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, service.ErrNoContent) {
+			res.WriteHeader(http.StatusNoContent)
+			return
+		}
+		respondInternalError(res, err)
+		return
+	}
+	out, err := json.Marshal(urls)
+	if err != nil {
+		respondInternalError(res, err)
+		return
+	}
+	res.Header().Set("content-type", "application/json")
+	res.Header().Set("content-length", strconv.Itoa(len(out)))
+	res.WriteHeader(http.StatusOK)
+	if _, err = res.Write(out); err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }

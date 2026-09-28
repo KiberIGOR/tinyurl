@@ -15,6 +15,7 @@ type MemoryString struct {
 	ID          string `json:"uuid"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
+	UserID      string `json:"user_id"`
 }
 
 // BatchRequest описывает элемент пакетного запроса.
@@ -27,4 +28,9 @@ type BatchRequest struct {
 type BatchResponse struct {
 	ID       string `json:"correlation_id"`
 	ShortURL string `json:"short_url"`
+}
+
+type UserResponse struct {
+	OriginalURL string `json:"original_url"`
+	ShortURL    string `json:"short_url"`
 }
