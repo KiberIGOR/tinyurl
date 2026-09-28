@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"io"
 	"net/http"
 )
 
@@ -25,19 +24,19 @@ func Initialize(a AuthService) {
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("Token")
+		var id int
 		if err != nil {
-			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, "no auth Cookie")
-			return
+			id = setCookie(w, r)
+		} else {
+			id = auth.GetUserID(r.Context(), cookie.Value)
+			if id <= 0 {
+				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				return
+			}
 		}
-		tokenString := cookie.Value
-		id := auth.GetUserID(r.Context(), tokenString)
 		if id <= 0 {
-			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, "invalid token")
 			return
 		}
-
 		ctx := context.WithValue(r.Context(), KeyUserID, id)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
