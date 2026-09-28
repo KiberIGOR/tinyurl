@@ -88,7 +88,7 @@ func (m *Memory) GetURLsByUserID(ctx context.Context, userID int) ([]URLEntry, e
 	return result, nil
 }
 
-func (m *Memory) GetLastId(ctx context.Context) int {
+func (m *Memory) GetLastID(ctx context.Context) int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

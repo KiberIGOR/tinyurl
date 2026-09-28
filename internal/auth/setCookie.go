@@ -30,7 +30,7 @@ func SetCookieMiddleware(next http.Handler) http.Handler {
 }
 
 func setCookie(w http.ResponseWriter, r *http.Request) int {
-	id := auth.GetLastId(r.Context())
+	id := auth.GetLastID(r.Context())
 	logger.Log.Info("new user created", zap.Int("user_id", id))
 
 	token, err := auth.BuildJWTString(r.Context(), id)
@@ -45,7 +45,7 @@ func setCookie(w http.ResponseWriter, r *http.Request) int {
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		MaxAge:   int(service.TOKEN_EXP.Seconds()),
+		MaxAge:   int(service.TokenExp.Seconds()),
 	})
 	return id
 }

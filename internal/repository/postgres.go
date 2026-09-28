@@ -123,7 +123,7 @@ func (d *DB) GetURLsByUserID(ctx context.Context, userID int) ([]URLEntry, error
 	return result, nil
 }
 
-func (d *DB) GetLastId(ctx context.Context) int {
+func (d *DB) GetLastID(ctx context.Context) int {
 	var id int
 	err := d.db.QueryRow(ctx, "SELECT nextval('user_id_seq')").Scan(&id)
 	if err != nil {

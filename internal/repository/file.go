@@ -250,7 +250,7 @@ func (m *FileMemory) GetURLsByUserID(ctx context.Context, userID int) ([]URLEntr
 	return result, nil
 }
 
-func (m *FileMemory) GetLastId(ctx context.Context) int {
+func (m *FileMemory) GetLastID(ctx context.Context) int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

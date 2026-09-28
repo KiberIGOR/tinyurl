@@ -13,7 +13,7 @@ const KeyUserID ctxKey = "user_id"
 type AuthService interface {
 	BuildJWTString(ctx context.Context, id int) (string, error)
 	GetUserID(ctx context.Context, tokenString string) int
-	GetLastId(ctx context.Context) int
+	GetLastID(ctx context.Context) int
 }
 
 var auth AuthService

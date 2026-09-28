@@ -9,7 +9,7 @@ import (
 )
 
 type UserRepository interface {
-	GetLastId(ctx context.Context) int
+	GetLastID(ctx context.Context) int
 }
 
 type AuthService struct {
@@ -31,7 +31,7 @@ type Claims struct {
 	UserID int
 }
 
-const TOKEN_EXP = time.Hour * 24
+const TokenExp = time.Hour * 24
 
 // BuildJWTString создаёт токен и возвращает его в виде строки.
 func (a *AuthService) BuildJWTString(ctx context.Context, id int) (string, error) {
@@ -39,7 +39,7 @@ func (a *AuthService) BuildJWTString(ctx context.Context, id int) (string, error
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			// когда создан токен
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(TOKEN_EXP)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(TokenExp)),
 		},
 		// собственное утверждение
 		UserID: id,
@@ -74,6 +74,6 @@ func (a *AuthService) GetUserID(ctx context.Context, tokenString string) int {
 	return claims.UserID
 }
 
-func (a *AuthService) GetLastId(ctx context.Context) int {
-	return a.repo.GetLastId(ctx)
+func (a *AuthService) GetLastID(ctx context.Context) int {
+	return a.repo.GetLastID(ctx)
 }
