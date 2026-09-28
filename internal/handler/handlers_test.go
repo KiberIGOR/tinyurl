@@ -405,48 +405,48 @@ func TestGetUsersURLs(t *testing.T) {
 	const redirect = "http://localhost:8080/"
 
 	type want struct {
-		code        int
+		code             int
 		responseShort    string
-		responseOriginal    string
-		contentType string
+		responseOriginal string
+		contentType      string
 	}
 	tests := []struct {
-		name        string
-		want        want
-		method      string
-		userID        int
+		name   string
+		want   want
+		method string
+		userID int
 	}{
 		{
 			name: "positive test #1",
 			want: want{
-				code:        200,
+				code:             200,
 				responseShort:    "EwHXdJfT",
-				responseOriginal:    "https://practicum.yandex.ru",
-				contentType: "application/json",
+				responseOriginal: "https://practicum.yandex.ru",
+				contentType:      "application/json",
 			},
-			method:      http.MethodGet,
+			method: http.MethodGet,
 			userID: 1,
 		},
 		{
 			name: "positive test #2",
 			want: want{
-				code:        204,
+				code:             204,
 				responseShort:    "EwHXdJfT",
-				responseOriginal:    "https://practicum.yandex.ru",
-				contentType: "application/json",
+				responseOriginal: "https://practicum.yandex.ru",
+				contentType:      "application/json",
 			},
-			method:      http.MethodGet,
+			method: http.MethodGet,
 			userID: 246,
 		},
 		{
 			name: "negative test #1",
 			want: want{
-				code:        401,
+				code:             401,
 				responseShort:    "EwHXdJfT",
-				responseOriginal:    "https://practicum.yandex.ru",
-				contentType: "application/json",
+				responseOriginal: "https://practicum.yandex.ru",
+				contentType:      "application/json",
 			},
-			method:      http.MethodGet,
+			method: http.MethodGet,
 			userID: -1,
 		},
 	}
@@ -479,7 +479,7 @@ func TestGetUsersURLs(t *testing.T) {
 
 			resBody, err := io.ReadAll(res.Body)
 			require.NoError(t, err)
-			
+
 			if test.want.code == http.StatusOK {
 				var resp []model.UserResponse
 				err = json.Unmarshal(resBody, &resp)
@@ -488,8 +488,8 @@ func TestGetUsersURLs(t *testing.T) {
 					"response body should start with %q, got %q", redirect, resp[0].ShortURL)
 				id := strings.TrimPrefix(resp[0].ShortURL, redirect)
 				assert.NotEmpty(t, id)
-				assert.Equal(t,id, test.want.responseShort)
-				assert.Equal(t,resp[0].OriginalURL, test.want.responseOriginal)
+				assert.Equal(t, id, test.want.responseShort)
+				assert.Equal(t, resp[0].OriginalURL, test.want.responseOriginal)
 				assert.Equal(t, test.want.contentType, res.Header.Get("content-type"))
 			}
 		})
