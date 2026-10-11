@@ -272,5 +272,4 @@ func (h *Handler) DeleteUsersURLs(res http.ResponseWriter, req *http.Request) {
 	go h.shortener.DeleteByUserID(context.Background(), userID, shortURLCh)
 
 	res.WriteHeader(http.StatusAccepted)
-	return
 }
