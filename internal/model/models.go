@@ -34,3 +34,5 @@ type UserResponse struct {
 	OriginalURL string `json:"original_url"`
 	ShortURL    string `json:"short_url"`
 }
+
+type DeleteRequest string

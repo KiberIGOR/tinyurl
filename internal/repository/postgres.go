@@ -25,13 +25,23 @@ func (d *DB) Ping(ctx context.Context) error {
 	return d.db.Ping(ctx)
 }
 
-func (d *DB) Get(ctx context.Context, id string) (string, bool) {
+func (d *DB) Get(ctx context.Context, id string) (string, error) {
 	var originalURL string
-	err := d.db.QueryRow(ctx, "SELECT original_url FROM urls WHERE short_url = $1", id).Scan(&originalURL)
+	var deleted bool
+	err := d.db.QueryRow(ctx,
+		"SELECT original_url, deleted_flag FROM urls WHERE short_url = $1",
+		id,
+	).Scan(&originalURL, &deleted)
 	if err != nil {
-		return "", false
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrNotFound
+		}
+		return "", err
 	}
-	return originalURL, true
+	if deleted {
+		return "", ErrDeleted
+	}
+	return originalURL, nil
 }
 
 func (d *DB) Save(ctx context.Context, id, originalURL string, userID int) (string, error) {
@@ -100,7 +110,10 @@ func (d *DB) BatchSave(ctx context.Context, entries []URLEntry, userID int) (Bat
 }
 
 func (d *DB) GetURLsByUserID(ctx context.Context, userID int) ([]URLEntry, error) {
-	rows, err := d.db.Query(ctx, "SELECT short_url, original_url FROM urls WHERE user_id = $1", userID)
+	rows, err := d.db.Query(ctx,
+		"SELECT short_url, original_url FROM urls WHERE user_id = $1 AND deleted_flag = FALSE",
+		userID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -121,6 +134,17 @@ func (d *DB) GetURLsByUserID(ctx context.Context, userID int) ([]URLEntry, error
 		return nil, ErrNoContent
 	}
 	return result, nil
+}
+
+func (d *DB) DeleteByShortURLs(ctx context.Context, userID int, shortURLs []string) error {
+	if len(shortURLs) == 0 {
+		return nil
+	}
+	_, err := d.db.Exec(ctx,
+		`UPDATE urls SET deleted_flag = TRUE WHERE user_id = $1 AND short_url = ANY($2)`,
+		userID, shortURLs,
+	)
+	return err
 }
 
 func (d *DB) GetLastID(ctx context.Context) int {

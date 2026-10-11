@@ -31,6 +31,7 @@ type Shortener interface {
 	Resolve(ctx context.Context, id string) (originalURL string, err error)
 	BatchShorten(ctx context.Context, batch []model.BatchRequest, userID int) ([]model.BatchResponse, error)
 	ResolveByUserID(ctx context.Context, userID int) ([]model.UserResponse, error)
+	DeleteByUserID(ctx context.Context, userID int, shortURLCh chan string)
 }
 type Pinger interface {
 	Ping(ctx context.Context) error
@@ -51,6 +52,10 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 	id := req.PathValue("id")
 	originalURL, err := h.shortener.Resolve(ctx, id)
 	if err != nil {
+		if errors.Is(err, service.ErrGone) {
+			http.Error(res, http.StatusText(http.StatusGone), http.StatusGone)
+			return
+		}
 		if errors.Is(err, service.ErrNotFound) {
 			http.Error(res, "URL not found", http.StatusBadRequest)
 			return
@@ -236,4 +241,36 @@ func (h *Handler) GetUsersURLs(res http.ResponseWriter, req *http.Request) {
 	if _, err = res.Write(out); err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
+}
+
+func (h *Handler) DeleteUsersURLs(res http.ResponseWriter, req *http.Request) {
+	userID, ok := req.Context().Value(auth.KeyUserID).(int)
+	if !ok || userID <= 0 {
+		http.Error(res, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+	content := req.Header.Get("content-type")
+	if content != "application/json" {
+		http.Error(res, "Only content-type: application/json are allowed!", http.StatusBadRequest)
+		return
+	}
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		respondBadRequest(res, err)
+		return
+	}
+	var bodyReq []model.DeleteRequest
+	if err := json.Unmarshal(body, &bodyReq); err != nil {
+		respondBadRequest(res, err)
+		return
+	}
+	shortURLCh := make(chan string, len(bodyReq))
+	for _, item := range bodyReq {
+		shortURLCh <- string(item)
+	}
+	close(shortURLCh)
+	go h.shortener.DeleteByUserID(context.Background(), userID, shortURLCh)
+
+	res.WriteHeader(http.StatusAccepted)
+	return
 }

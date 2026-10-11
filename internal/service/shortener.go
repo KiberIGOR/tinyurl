@@ -8,20 +8,24 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/KiberIGOR/tinyurl/internal/logger"
 	"github.com/KiberIGOR/tinyurl/internal/model"
 	"github.com/KiberIGOR/tinyurl/internal/repository"
+	"go.uber.org/zap"
 )
 
 var ErrNotFound = errors.New("URL not found")
+var ErrGone = errors.New("URL deleted")
 var ErrCollision = errors.New("not found correct id for URL(collision)")
 var ErrConflict = errors.New("original URL already exists")
 var ErrNoContent = errors.New("URLs not found")
 
 type URLRepository interface {
-	Get(ctx context.Context, id string) (string, bool)
+	Get(ctx context.Context, id string) (string, error)
 	Save(ctx context.Context, id, originalURL string, userID int) (string, error)
 	BatchSave(ctx context.Context, entries []repository.URLEntry, userID int) (repository.BatchSaveResult, error)
 	GetURLsByUserID(ctx context.Context, userID int) ([]repository.URLEntry, error)
+	DeleteByShortURLs(ctx context.Context, userID int, array []string) error
 }
 
 type Shortener struct {
@@ -63,9 +67,15 @@ func (s *Shortener) Shorten(ctx context.Context, originalURL string, userID int)
 }
 
 func (s *Shortener) Resolve(ctx context.Context, id string) (string, error) {
-	originalURL, ok := s.repo.Get(ctx, id)
-	if !ok {
-		return "", ErrNotFound
+	originalURL, err := s.repo.Get(ctx, id)
+	if err != nil {
+		if errors.Is(err, repository.ErrDeleted) {
+			return "", ErrGone
+		}
+		if errors.Is(err, repository.ErrNotFound) {
+			return "", ErrNotFound
+		}
+		return "", err
 	}
 	return originalURL, nil
 }
@@ -169,4 +179,15 @@ func (s *Shortener) ResolveByUserID(ctx context.Context, userID int) ([]model.Us
 		})
 	}
 	return out, nil
+}
+
+func (s *Shortener) DeleteByUserID(ctx context.Context, userID int, shortURLCh chan string) {
+	shortURLs := []string{}
+	for item := range shortURLCh {
+		shortURLs = append(shortURLs, item)
+	}
+	if err := s.repo.DeleteByShortURLs(ctx, userID, shortURLs); err != nil {
+		logger.Log.Error("delete url", zap.Error(err), zap.Int("user_id", userID))
+	}
+
 }

@@ -92,6 +92,7 @@ func main() {
 		r.Get("/{id}", h.GetURL)
 	})
 	r.With(auth.AuthMiddleware).Get("/api/user/urls", h.GetUsersURLs)
+	r.With(auth.AuthMiddleware).Delete("/api/user/urls", h.DeleteUsersURLs)
 	err = http.ListenAndServe(cfg.Address, r)
 	if err != nil {
 		log.Fatal(err)

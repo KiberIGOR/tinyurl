@@ -23,6 +23,7 @@ type FileMemory struct {
 	mu         sync.RWMutex
 	byShort    map[string]string
 	byUser     map[int][]string
+	deleted    map[string]struct{}
 	file       *os.File
 	enc        *json.Encoder
 	nextID     int
@@ -56,6 +57,7 @@ func NewFile(fileName string) (*FileMemory, error) {
 	return &FileMemory{
 		byShort:    byShort,
 		byUser:     byUser,
+		deleted:    make(map[string]struct{}),
 		file:       file,
 		enc:        json.NewEncoder(file),
 		nextID:     len(records) + 1,
@@ -162,10 +164,17 @@ func (m *FileMemory) Close() error {
 	return err
 }
 
-func (m *FileMemory) Get(ctx context.Context, id string) (string, bool) {
+func (m *FileMemory) Get(ctx context.Context, id string) (string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.get(id)
+	if m.isDeleted(id) {
+		return "", ErrDeleted
+	}
+	originalURL, ok := m.byShort[id]
+	if !ok {
+		return "", ErrNotFound
+	}
+	return originalURL, nil
 }
 
 func (m *FileMemory) Save(ctx context.Context, shortURL, originalURL string, userID int) (string, error) {
@@ -238,6 +247,9 @@ func (m *FileMemory) GetURLsByUserID(ctx context.Context, userID int) ([]URLEntr
 	}
 	result := make([]URLEntry, 0, len(shorts))
 	for _, short := range shorts {
+		if m.isDeleted(short) {
+			continue
+		}
 		originalURL, ok := m.byShort[short]
 		if !ok {
 			continue
@@ -247,7 +259,26 @@ func (m *FileMemory) GetURLsByUserID(ctx context.Context, userID int) ([]URLEntr
 			OriginalURL: originalURL,
 		})
 	}
+	if len(result) == 0 {
+		return nil, ErrNoContent
+	}
 	return result, nil
+}
+
+func (m *FileMemory) DeleteByShortURLs(ctx context.Context, userID int, shortURLs []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, short := range shortURLs {
+		if !m.userOwnsShort(userID, short) {
+			continue
+		}
+		if _, ok := m.byShort[short]; !ok {
+			continue
+		}
+		m.deleted[short] = struct{}{}
+	}
+	return nil
 }
 
 func (m *FileMemory) GetLastID(ctx context.Context) int {
@@ -259,8 +290,25 @@ func (m *FileMemory) GetLastID(ctx context.Context) int {
 }
 
 func (m *FileMemory) get(id string) (string, bool) {
+	if m.isDeleted(id) {
+		return "", false
+	}
 	originalURL, ok := m.byShort[id]
 	return originalURL, ok
+}
+
+func (m *FileMemory) isDeleted(short string) bool {
+	_, ok := m.deleted[short]
+	return ok
+}
+
+func (m *FileMemory) userOwnsShort(userID int, short string) bool {
+	for _, s := range m.byUser[userID] {
+		if s == short {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *FileMemory) findByOriginal(originalURL string) (string, bool) {

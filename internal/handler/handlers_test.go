@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -77,7 +78,7 @@ func TestGetUrlHandler(t *testing.T) {
 			require.NoError(t, err)
 			defer store.Close()
 			if test.want.code == http.StatusTemporaryRedirect {
-				if _, ok := store.Get(context.Background(), test.path); !ok {
+				if _, err := store.Get(context.Background(), test.path); errors.Is(err, repository.ErrNotFound) {
 					_, err = store.Save(context.Background(), test.path, test.want.location, randomUserID(t))
 					require.NoError(t, err)
 				}
@@ -179,8 +180,8 @@ func TestPostUrlHandler(t *testing.T) {
 					"response body should start with %q, got %q", test.want.response, body)
 				id := strings.TrimPrefix(body, test.want.response)
 				assert.NotEmpty(t, id)
-				originalURL, ok := store.Get(context.Background(), id)
-				assert.True(t, ok)
+				originalURL, err := store.Get(context.Background(), id)
+				require.NoError(t, err)
 				assert.Equal(t, test.data, originalURL)
 			} else {
 				assert.Equal(t, test.want.response, body)
@@ -283,8 +284,8 @@ func TestPostJsonUrlHandler(t *testing.T) {
 					"response body should start with %q, got %q", test.want.response, resp.URL)
 				id := strings.TrimPrefix(resp.URL, test.want.response)
 				assert.NotEmpty(t, id)
-				originalURL, ok := store.Get(context.Background(), id)
-				assert.True(t, ok)
+				originalURL, err := store.Get(context.Background(), id)
+				require.NoError(t, err)
 				err = json.Unmarshal([]byte(test.data), &req)
 				require.NoError(t, err)
 				assert.Equal(t, req.URL, originalURL)
@@ -387,8 +388,8 @@ func TestPostBatchHandler(t *testing.T) {
 					"response body should start with %q, got %q", test.want.response, resp[0].ShortURL)
 				id := strings.TrimPrefix(resp[0].ShortURL, test.want.response)
 				assert.NotEmpty(t, id)
-				originalURL, ok := store.Get(context.Background(), id)
-				assert.True(t, ok)
+				originalURL, err := store.Get(context.Background(), id)
+				require.NoError(t, err)
 				err = json.Unmarshal([]byte(test.data), &req)
 				require.NoError(t, err)
 				assert.Equal(t, req[0].OriginalURL, originalURL)
@@ -465,7 +466,7 @@ func TestGetUsersURLs(t *testing.T) {
 			require.NoError(t, err)
 			defer store.Close()
 			if test.want.code == http.StatusOK {
-				if _, ok := store.Get(context.Background(), test.want.responseShort); !ok {
+				if _, err := store.Get(context.Background(), test.want.responseShort); errors.Is(err, repository.ErrNotFound) {
 					_, err = store.Save(context.Background(), test.want.responseShort, test.want.responseOriginal, userID)
 					require.NoError(t, err)
 				}

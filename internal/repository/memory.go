@@ -8,11 +8,14 @@ import (
 )
 
 var ErrAlreadyExist = errors.New("short URL already exist")
+var ErrNotFound = errors.New("URL not found")
+var ErrDeleted = errors.New("URL deleted")
 
 type Memory struct {
 	mu         sync.RWMutex
 	byShort    map[string]string // short_url → original_url
 	byUser     map[int][]string  // userID → список short_url
+	deleted    map[string]struct{}
 	lastUserID int
 }
 
@@ -20,13 +23,21 @@ func NewMemory() *Memory {
 	return &Memory{
 		byShort: make(map[string]string),
 		byUser:  make(map[int][]string),
+		deleted: make(map[string]struct{}),
 	}
 }
 
-func (m *Memory) Get(ctx context.Context, id string) (string, bool) {
+func (m *Memory) Get(ctx context.Context, id string) (string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.get(id)
+	if m.isDeleted(id) {
+		return "", ErrDeleted
+	}
+	originalURL, ok := m.byShort[id]
+	if !ok {
+		return "", ErrNotFound
+	}
+	return originalURL, nil
 }
 
 func (m *Memory) Save(ctx context.Context, shortURL, originalURL string, userID int) (string, error) {
@@ -76,6 +87,9 @@ func (m *Memory) GetURLsByUserID(ctx context.Context, userID int) ([]URLEntry, e
 	}
 	result := make([]URLEntry, 0, len(shorts))
 	for _, short := range shorts {
+		if m.isDeleted(short) {
+			continue
+		}
 		originalURL, ok := m.byShort[short]
 		if !ok {
 			continue
@@ -84,6 +98,9 @@ func (m *Memory) GetURLsByUserID(ctx context.Context, userID int) ([]URLEntry, e
 			ShortURL:    short,
 			OriginalURL: originalURL,
 		})
+	}
+	if len(result) == 0 {
+		return nil, ErrNoContent
 	}
 	return result, nil
 }
@@ -96,9 +113,42 @@ func (m *Memory) GetLastID(ctx context.Context) int {
 	return m.lastUserID
 }
 
+func (m *Memory) DeleteByShortURLs(ctx context.Context, userID int, shortURLs []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, short := range shortURLs {
+		if !m.userOwnsShort(userID, short) {
+			continue
+		}
+		if _, ok := m.byShort[short]; !ok {
+			continue
+		}
+		m.deleted[short] = struct{}{}
+	}
+	return nil
+}
+
 func (m *Memory) get(id string) (string, bool) {
+	if m.isDeleted(id) {
+		return "", false
+	}
 	originalURL, ok := m.byShort[id]
 	return originalURL, ok
+}
+
+func (m *Memory) isDeleted(short string) bool {
+	_, ok := m.deleted[short]
+	return ok
+}
+
+func (m *Memory) userOwnsShort(userID int, short string) bool {
+	for _, s := range m.byUser[userID] {
+		if s == short {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Memory) findByOriginal(originalURL string) (string, bool) {
