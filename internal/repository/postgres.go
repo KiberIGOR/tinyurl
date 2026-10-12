@@ -11,6 +11,7 @@ import (
 )
 
 var ErrConflict = errors.New("original URL already exists")
+var ErrNoContent = errors.New("no content")
 
 type DB struct {
 	db *pgxpool.Pool
@@ -24,17 +25,27 @@ func (d *DB) Ping(ctx context.Context) error {
 	return d.db.Ping(ctx)
 }
 
-func (d *DB) Get(ctx context.Context, id string) (string, bool) {
+func (d *DB) Get(ctx context.Context, id string) (string, error) {
 	var originalURL string
-	err := d.db.QueryRow(ctx, "SELECT original_url FROM urls WHERE short_url = $1", id).Scan(&originalURL)
+	var deleted bool
+	err := d.db.QueryRow(ctx,
+		"SELECT original_url, deleted_flag FROM urls WHERE short_url = $1",
+		id,
+	).Scan(&originalURL, &deleted)
 	if err != nil {
-		return "", false
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrNotFound
+		}
+		return "", err
 	}
-	return originalURL, true
+	if deleted {
+		return "", ErrDeleted
+	}
+	return originalURL, nil
 }
 
-func (d *DB) Save(ctx context.Context, id, originalURL string) (string, error) {
-	_, err := d.db.Exec(ctx, "INSERT INTO urls (short_url, original_url) VALUES ($1, $2)", id, originalURL)
+func (d *DB) Save(ctx context.Context, id, originalURL string, userID int) (string, error) {
+	_, err := d.db.Exec(ctx, "INSERT INTO urls (short_url, original_url, user_id) VALUES ($1, $2, $3)", id, originalURL, userID)
 	if err == nil {
 		return "", nil
 	}
@@ -55,7 +66,7 @@ func (d *DB) Save(ctx context.Context, id, originalURL string) (string, error) {
 	return "", err2
 }
 
-func (d *DB) BatchSave(ctx context.Context, entries []URLEntry) (BatchSaveResult, error) {
+func (d *DB) BatchSave(ctx context.Context, entries []URLEntry, userID int) (BatchSaveResult, error) {
 	result := BatchSaveResult{
 		Existing: make(map[string]string),
 	}
@@ -67,12 +78,12 @@ func (d *DB) BatchSave(ctx context.Context, entries []URLEntry) (BatchSaveResult
 	defer tx.Rollback(ctx)
 
 	const insertSQL = `
-		INSERT INTO urls (short_url, original_url)
-		VALUES ($1, $2)
+		INSERT INTO urls (short_url, original_url, user_id)
+		VALUES ($1, $2, $3)
 		ON CONFLICT (short_url) DO NOTHING`
 
 	for _, item := range entries {
-		tag, err := tx.Exec(ctx, insertSQL, item.ShortURL, item.OriginalURL)
+		tag, err := tx.Exec(ctx, insertSQL, item.ShortURL, item.OriginalURL, userID)
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
@@ -96,4 +107,51 @@ func (d *DB) BatchSave(ctx context.Context, entries []URLEntry) (BatchSaveResult
 		return result, err
 	}
 	return result, nil
+}
+
+func (d *DB) GetURLsByUserID(ctx context.Context, userID int) ([]URLEntry, error) {
+	rows, err := d.db.Query(ctx,
+		"SELECT short_url, original_url FROM urls WHERE user_id = $1 AND deleted_flag = FALSE",
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []URLEntry
+	for rows.Next() {
+		var v URLEntry
+		if err := rows.Scan(&v.ShortURL, &v.OriginalURL); err != nil {
+			return nil, err
+		}
+		result = append(result, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(result) == 0 {
+		return nil, ErrNoContent
+	}
+	return result, nil
+}
+
+func (d *DB) DeleteByShortURLs(ctx context.Context, userID int, shortURLs []string) error {
+	if len(shortURLs) == 0 {
+		return nil
+	}
+	_, err := d.db.Exec(ctx,
+		`UPDATE urls SET deleted_flag = TRUE WHERE user_id = $1 AND short_url = ANY($2)`,
+		userID, shortURLs,
+	)
+	return err
+}
+
+func (d *DB) GetLastID(ctx context.Context) int {
+	var id int
+	err := d.db.QueryRow(ctx, "SELECT nextval('user_id_seq')").Scan(&id)
+	if err != nil {
+		return 1
+	}
+	return id
 }

@@ -20,11 +20,14 @@ var ErrParsingJSON = errors.New("error while parsing JSON")
 var ErrWritingJSON = errors.New("error while writing JSON")
 
 type FileMemory struct {
-	mu     sync.RWMutex
-	urls   map[string]string
-	file   *os.File
-	enc    *json.Encoder
-	nextID int
+	mu         sync.RWMutex
+	byShort    map[string]string
+	byUser     map[int][]string
+	deleted    map[string]struct{}
+	file       *os.File
+	enc        *json.Encoder
+	nextID     int
+	lastUserID int
 }
 
 func NewFile(fileName string) (*FileMemory, error) {
@@ -39,10 +42,7 @@ func NewFile(fileName string) (*FileMemory, error) {
 		return nil, err
 	}
 
-	urls := make(map[string]string, len(records))
-	for _, record := range records {
-		urls[record.ShortURL] = record.OriginalURL
-	}
+	byShort, byUser, maxUserID := indexesFromRecords(records)
 
 	if legacy {
 		if err := writeRecords(file, records); err != nil {
@@ -55,10 +55,13 @@ func NewFile(fileName string) (*FileMemory, error) {
 	}
 
 	return &FileMemory{
-		urls:   urls,
-		file:   file,
-		enc:    json.NewEncoder(file),
-		nextID: len(records) + 1,
+		byShort:    byShort,
+		byUser:     byUser,
+		deleted:    make(map[string]struct{}),
+		file:       file,
+		enc:        json.NewEncoder(file),
+		nextID:     len(records) + 1,
+		lastUserID: maxUserID,
 	}, nil
 }
 
@@ -120,6 +123,34 @@ func writeRecords(file *os.File, records []model.MemoryString) error {
 	return nil
 }
 
+func indexesFromRecords(records []model.MemoryString) (map[string]string, map[int][]string, int) {
+	byShort := make(map[string]string, len(records))
+	byUser := make(map[int][]string)
+	maxUserID := 0
+
+	for _, record := range records {
+		byShort[record.ShortURL] = record.OriginalURL
+		userID := parseUserID(record.UserID)
+		byUser[userID] = append(byUser[userID], record.ShortURL)
+		if userID > maxUserID {
+			maxUserID = userID
+		}
+	}
+
+	return byShort, byUser, maxUserID
+}
+
+func parseUserID(value string) int {
+	if value == "" {
+		return 0
+	}
+	userID, err := strconv.Atoi(value)
+	if err != nil {
+		return 0
+	}
+	return userID
+}
+
 func (m *FileMemory) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -133,35 +164,44 @@ func (m *FileMemory) Close() error {
 	return err
 }
 
-func (m *FileMemory) Get(ctx context.Context, id string) (string, bool) {
+func (m *FileMemory) Get(ctx context.Context, id string) (string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.get(id)
+	if m.isDeleted(id) {
+		return "", ErrDeleted
+	}
+	originalURL, ok := m.byShort[id]
+	if !ok {
+		return "", ErrNotFound
+	}
+	return originalURL, nil
 }
 
-func (m *FileMemory) Save(ctx context.Context, id, originalURL string) (string, error) {
+func (m *FileMemory) Save(ctx context.Context, shortURL, originalURL string, userID int) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if _, ok := m.get(id); ok {
-		return "", fmt.Errorf("%w: %q", ErrAlreadyExist, id)
+	if _, ok := m.get(shortURL); ok {
+		return "", fmt.Errorf("%w: %q", ErrAlreadyExist, shortURL)
 	}
 
 	record := model.MemoryString{
 		ID:          strconv.Itoa(m.nextID),
-		ShortURL:    id,
+		ShortURL:    shortURL,
 		OriginalURL: originalURL,
+		UserID:      strconv.Itoa(userID),
 	}
 	if err := m.enc.Encode(record); err != nil {
 		return "", fmt.Errorf("%w: %w", ErrWritingJSON, err)
 	}
 
 	m.nextID++
-	m.urls[id] = originalURL
+	m.byShort[shortURL] = originalURL
+	m.byUser[userID] = append(m.byUser[userID], shortURL)
 	return "", nil
 }
 
-func (m *FileMemory) BatchSave(ctx context.Context, entries []URLEntry) (BatchSaveResult, error) {
+func (m *FileMemory) BatchSave(ctx context.Context, entries []URLEntry, userID int) (BatchSaveResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -183,24 +223,96 @@ func (m *FileMemory) BatchSave(ctx context.Context, entries []URLEntry) (BatchSa
 			ID:          strconv.Itoa(m.nextID),
 			ShortURL:    item.ShortURL,
 			OriginalURL: item.OriginalURL,
+			UserID:      strconv.Itoa(userID),
 		}
 		if err := m.enc.Encode(record); err != nil {
 			return result, fmt.Errorf("%w: %w", ErrWritingJSON, err)
 		}
+
 		m.nextID++
-		m.urls[item.ShortURL] = item.OriginalURL
+		m.byShort[item.ShortURL] = item.OriginalURL
+		m.byUser[userID] = append(m.byUser[userID], item.ShortURL)
 	}
 
 	return result, nil
 }
 
+func (m *FileMemory) GetURLsByUserID(ctx context.Context, userID int) ([]URLEntry, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	shorts := m.byUser[userID]
+	if len(shorts) == 0 {
+		return nil, ErrNoContent
+	}
+	result := make([]URLEntry, 0, len(shorts))
+	for _, short := range shorts {
+		if m.isDeleted(short) {
+			continue
+		}
+		originalURL, ok := m.byShort[short]
+		if !ok {
+			continue
+		}
+		result = append(result, URLEntry{
+			ShortURL:    short,
+			OriginalURL: originalURL,
+		})
+	}
+	if len(result) == 0 {
+		return nil, ErrNoContent
+	}
+	return result, nil
+}
+
+func (m *FileMemory) DeleteByShortURLs(ctx context.Context, userID int, shortURLs []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, short := range shortURLs {
+		if !m.userOwnsShort(userID, short) {
+			continue
+		}
+		if _, ok := m.byShort[short]; !ok {
+			continue
+		}
+		m.deleted[short] = struct{}{}
+	}
+	return nil
+}
+
+func (m *FileMemory) GetLastID(ctx context.Context) int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.lastUserID++
+	return m.lastUserID
+}
+
 func (m *FileMemory) get(id string) (string, bool) {
-	originalURL, ok := m.urls[id]
+	if m.isDeleted(id) {
+		return "", false
+	}
+	originalURL, ok := m.byShort[id]
 	return originalURL, ok
 }
 
+func (m *FileMemory) isDeleted(short string) bool {
+	_, ok := m.deleted[short]
+	return ok
+}
+
+func (m *FileMemory) userOwnsShort(userID int, short string) bool {
+	for _, s := range m.byUser[userID] {
+		if s == short {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *FileMemory) findByOriginal(originalURL string) (string, bool) {
-	for shortURL, url := range m.urls {
+	for shortURL, url := range m.byShort {
 		if url == originalURL {
 			return shortURL, true
 		}
