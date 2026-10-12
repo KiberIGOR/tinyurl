@@ -1,0 +1,9 @@
+{"uuid":"1","short_url":"EwHXdJfB","original_url":"https://practicum.yandex.ru/","user_id":"258665"}
+{"uuid":"2","short_url":"782Qn5qb","original_url":"https://practicum.yandex.ru/","user_id":"550840"}
+{"uuid":"3","short_url":"BHdDajzq","original_url":"https://practicum.yandex.ru","user_id":"202230"}
+{"uuid":"4","short_url":"EwHXdJfT","original_url":"https://practicum.yandex.ru","user_id":"1"}
+{"uuid":"5","short_url":"EwHXdJfF","original_url":"https://practicum.yandex.ru","user_id":"742526"}
+{"uuid":"6","short_url":"wkBPW7kc","original_url":"https://practicum.yandex.ru/","user_id":"127254"}
+{"uuid":"7","short_url":"lFSXYUPJ","original_url":"https://practicum.yandex.ru","user_id":"304204"}
+{"uuid":"8","short_url":"lZshyG1Q","original_url":"https://practicum.yandex.ru/","user_id":"526261"}
+{"uuid":"9","short_url":"Uf5aG3w_","original_url":"https://practicum.yandex.ru","user_id":"574566"}

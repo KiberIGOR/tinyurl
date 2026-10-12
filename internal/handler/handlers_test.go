@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/KiberIGOR/tinyurl/internal/auth"
 	"github.com/KiberIGOR/tinyurl/internal/mocks"
@@ -492,6 +493,93 @@ func TestGetUsersURLs(t *testing.T) {
 				assert.Equal(t, id, test.want.responseShort)
 				assert.Equal(t, resp[0].OriginalURL, test.want.responseOriginal)
 				assert.Equal(t, test.want.contentType, res.Header.Get("content-type"))
+			}
+		})
+	}
+}
+
+func TestDeleteUsersURLs(t *testing.T) {
+	const redirect = "http://localhost:8080/"
+
+	type want struct {
+		code             int
+		responseShort    string
+		responseOriginal string
+		contentType      string
+	}
+	tests := []struct {
+		name   string
+		want   want
+		method string
+		data string
+	}{
+		{
+			name: "positive test #1",
+			want: want{
+				code:             202,
+				responseShort:    "EwHXdJfF",
+				responseOriginal: "https://practicum.yandex.ru",
+				contentType:      "application/json",
+			},
+			method: http.MethodDelete,
+			data: `["EwHXdJfF"]`,
+		},
+		{
+			name: "positive test #1",
+			want: want{
+				code:             400,
+				responseShort:    "EwHBdJfA",
+				responseOriginal: "https://practicum.yandex.ru",
+				contentType:      "text/plain",
+			},
+			method: http.MethodDelete,
+			data: `["EwHBdJfA"]`,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			userID := randomUserID(t)
+			request := httptest.NewRequest(test.method, "/api/user/urls", strings.NewReader(test.data))
+			request.Header.Set("content-type", test.want.contentType)
+			request = requestWithUserID(request, userID)
+
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			m := mocks.NewMockPinger(ctrl)
+
+			w := httptest.NewRecorder()
+			store := repository.NewMemory()
+			if test.want.code == http.StatusAccepted {
+				_, err := store.Save(context.Background(), test.want.responseShort, test.want.responseOriginal, userID)
+				require.NoError(t, err)
+			}
+			h := New(service.NewShortener(store, redirect), m)
+			h.DeleteUsersURLs(w, request)
+
+			res := w.Result()
+			assert.Equal(t, test.want.code, res.StatusCode)
+			defer res.Body.Close()
+
+			if test.want.code == http.StatusAccepted {
+				require.Eventually(t, func() bool {
+					getReq := httptest.NewRequest(http.MethodGet, "/"+test.want.responseShort, nil)
+					getReq.SetPathValue("id", test.want.responseShort)
+					getW := httptest.NewRecorder()
+					h.GetURL(getW, getReq)
+					return getW.Code == http.StatusGone
+				}, time.Second, 10*time.Millisecond)
+
+				getReq := httptest.NewRequest(http.MethodGet, "/"+test.want.responseShort, nil)
+				getReq.SetPathValue("id", test.want.responseShort)
+				getW := httptest.NewRecorder()
+				h.GetURL(getW, getReq)
+
+				getRes := getW.Result()
+				defer getRes.Body.Close()
+				assert.Equal(t, http.StatusGone, getRes.StatusCode)
+				getBody, err := io.ReadAll(getRes.Body)
+				require.NoError(t, err)
+				assert.Equal(t, http.StatusText(http.StatusGone)+"\n", string(getBody))
 			}
 		})
 	}
