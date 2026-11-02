@@ -8,6 +8,7 @@ import (
 
 	"log"
 
+	"github.com/KiberIGOR/tinyurl/internal/audit"
 	"github.com/KiberIGOR/tinyurl/internal/auth"
 	"github.com/KiberIGOR/tinyurl/internal/compress"
 	"github.com/KiberIGOR/tinyurl/internal/config"
@@ -75,7 +76,20 @@ func main() {
 		pinger = nilPinger{}
 	}
 	svc := service.NewShortener(store, cfg.BaseURL)
-	h := handler.New(svc, pinger)
+
+	auditBroker := audit.NewBroker()
+	if cfg.AuditFile != "" {
+		fileObserver, err := audit.NewFileObserver(cfg.AuditFile)
+		if err != nil {
+			log.Fatal("audit file: ", err)
+		}
+		auditBroker.Subscribe(fileObserver)
+	}
+	if cfg.AuditURL != "" {
+		auditBroker.Subscribe(audit.NewHTTPObserver(cfg.AuditURL, nil))
+	}
+
+	h := handler.New(svc, pinger, auditBroker)
 
 	auth.Initialize(service.NewAuthService(userRepo, cfg.SecretKey))
 
