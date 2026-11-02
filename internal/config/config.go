@@ -10,6 +10,7 @@ type Config struct {
 	BaseURL         string
 	FileStoragePath string
 	DataBaseDSN     string
+	SecretKey       string
 }
 
 func Parse() *Config {
@@ -20,6 +21,7 @@ func Parse() *Config {
 	flag.StringVar(&cfg.FileStoragePath, "f", "", "file name witch will be use for storage")
 	// ps := fmt.Sprintf("postgres://%s:%s@localhost:5432/urls?sslmode=disable","urls","urls")
 	flag.StringVar(&cfg.DataBaseDSN, "d", "", "dsn string for database setting")
+	flag.StringVar(&cfg.SecretKey, "k", "J83YbUemqzZBG1iJoNz8", "Secret Key for JWT")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("SERVER_ADDRESS"); envRunAddr != "" {

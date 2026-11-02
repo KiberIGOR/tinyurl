@@ -2,13 +2,18 @@ package handler
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/KiberIGOR/tinyurl/internal/auth"
 	"github.com/KiberIGOR/tinyurl/internal/mocks"
 	"github.com/KiberIGOR/tinyurl/internal/model"
 	"github.com/KiberIGOR/tinyurl/internal/repository"
@@ -17,6 +22,19 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
+
+func randomUserID(t *testing.T) int {
+	t.Helper()
+	var b [4]byte
+	_, err := rand.Read(b[:])
+	require.NoError(t, err)
+	return int(binary.BigEndian.Uint32(b[:])%999999) + 1
+}
+
+func requestWithUserID(r *http.Request, userID int) *http.Request {
+	ctx := context.WithValue(r.Context(), auth.KeyUserID, userID)
+	return r.WithContext(ctx)
+}
 
 func TestGetUrlHandler(t *testing.T) {
 	type want struct {
@@ -59,7 +77,13 @@ func TestGetUrlHandler(t *testing.T) {
 			m := mocks.NewMockPinger(ctrl)
 
 			require.NoError(t, err)
-			store.Save(context.Background(), "EwHXdJfB", "https://practicum.yandex.ru/")
+			defer store.Close()
+			if test.want.code == http.StatusTemporaryRedirect {
+				if _, err := store.Get(context.Background(), test.path); errors.Is(err, repository.ErrNotFound) {
+					_, err = store.Save(context.Background(), test.path, test.want.location, randomUserID(t))
+					require.NoError(t, err)
+				}
+			}
 			h := New(service.NewShortener(store, "http://localhost:8080/"), m)
 
 			request := httptest.NewRequest(test.method, "/"+test.path, nil)
@@ -130,8 +154,11 @@ func TestPostUrlHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			userID := randomUserID(t)
 			request := httptest.NewRequest(test.method, "/", strings.NewReader(test.data))
 			request.Header.Set("content-type", test.contentType)
+			request = requestWithUserID(request, userID)
+
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 			m := mocks.NewMockPinger(ctrl)
@@ -139,6 +166,7 @@ func TestPostUrlHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 			store, err := repository.NewFile("fileMemoryTest.txt")
 			require.NoError(t, err)
+			defer store.Close()
 			h := New(service.NewShortener(store, redirect), m)
 			h.PostURLHandler(w, request)
 
@@ -153,8 +181,8 @@ func TestPostUrlHandler(t *testing.T) {
 					"response body should start with %q, got %q", test.want.response, body)
 				id := strings.TrimPrefix(body, test.want.response)
 				assert.NotEmpty(t, id)
-				originalURL, ok := store.Get(context.Background(), id)
-				assert.True(t, ok)
+				originalURL, err := store.Get(context.Background(), id)
+				require.NoError(t, err)
 				assert.Equal(t, test.data, originalURL)
 			} else {
 				assert.Equal(t, test.want.response, body)
@@ -227,8 +255,10 @@ func TestPostJsonUrlHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			userID := randomUserID(t)
 			request := httptest.NewRequest(test.method, "/api/shorten", strings.NewReader(test.data))
 			request.Header.Set("content-type", test.contentType)
+			request = requestWithUserID(request, userID)
 
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
@@ -237,6 +267,7 @@ func TestPostJsonUrlHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 			store, err := repository.NewFile("fileMemoryTest.txt")
 			require.NoError(t, err)
+			defer store.Close()
 			h := New(service.NewShortener(store, redirect), m)
 			h.PostJSONURLHandler(w, request)
 
@@ -254,8 +285,8 @@ func TestPostJsonUrlHandler(t *testing.T) {
 					"response body should start with %q, got %q", test.want.response, resp.URL)
 				id := strings.TrimPrefix(resp.URL, test.want.response)
 				assert.NotEmpty(t, id)
-				originalURL, ok := store.Get(context.Background(), id)
-				assert.True(t, ok)
+				originalURL, err := store.Get(context.Background(), id)
+				require.NoError(t, err)
 				err = json.Unmarshal([]byte(test.data), &req)
 				require.NoError(t, err)
 				assert.Equal(t, req.URL, originalURL)
@@ -328,8 +359,10 @@ func TestPostBatchHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			userID := randomUserID(t)
 			request := httptest.NewRequest(test.method, "/api/shorten/batch", strings.NewReader(test.data))
 			request.Header.Set("content-type", test.contentType)
+			request = requestWithUserID(request, userID)
 
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
@@ -338,6 +371,7 @@ func TestPostBatchHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 			store, err := repository.NewFile("fileMemoryTest.txt")
 			require.NoError(t, err)
+			defer store.Close()
 			h := New(service.NewShortener(store, redirect), m)
 			h.PostBatchHandler(w, request)
 
@@ -355,8 +389,8 @@ func TestPostBatchHandler(t *testing.T) {
 					"response body should start with %q, got %q", test.want.response, resp[0].ShortURL)
 				id := strings.TrimPrefix(resp[0].ShortURL, test.want.response)
 				assert.NotEmpty(t, id)
-				originalURL, ok := store.Get(context.Background(), id)
-				assert.True(t, ok)
+				originalURL, err := store.Get(context.Background(), id)
+				require.NoError(t, err)
 				err = json.Unmarshal([]byte(test.data), &req)
 				require.NoError(t, err)
 				assert.Equal(t, req[0].OriginalURL, originalURL)
@@ -365,6 +399,188 @@ func TestPostBatchHandler(t *testing.T) {
 			}
 
 			assert.Equal(t, test.want.contentType, res.Header.Get("content-type"))
+		})
+	}
+}
+
+func TestGetUsersURLs(t *testing.T) {
+	const redirect = "http://localhost:8080/"
+
+	type want struct {
+		code             int
+		responseShort    string
+		responseOriginal string
+		contentType      string
+	}
+	tests := []struct {
+		name   string
+		want   want
+		method string
+		userID int
+	}{
+		{
+			name: "positive test #1",
+			want: want{
+				code:             200,
+				responseShort:    "EwHXdJfT",
+				responseOriginal: "https://practicum.yandex.ru",
+				contentType:      "application/json",
+			},
+			method: http.MethodGet,
+			userID: 1,
+		},
+		{
+			name: "positive test #2",
+			want: want{
+				code:             204,
+				responseShort:    "EwHXdJfT",
+				responseOriginal: "https://practicum.yandex.ru",
+				contentType:      "application/json",
+			},
+			method: http.MethodGet,
+			userID: 246,
+		},
+		{
+			name: "negative test #1",
+			want: want{
+				code:             401,
+				responseShort:    "EwHXdJfT",
+				responseOriginal: "https://practicum.yandex.ru",
+				contentType:      "application/json",
+			},
+			method: http.MethodGet,
+			userID: -1,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			userID := test.userID
+			request := httptest.NewRequest(test.method, "/api/user/urls", nil)
+			request = requestWithUserID(request, userID)
+
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			m := mocks.NewMockPinger(ctrl)
+
+			w := httptest.NewRecorder()
+			store, err := repository.NewFile("fileMemoryTest.txt")
+			require.NoError(t, err)
+			defer store.Close()
+			if test.want.code == http.StatusOK {
+				if _, err := store.Get(context.Background(), test.want.responseShort); errors.Is(err, repository.ErrNotFound) {
+					_, err = store.Save(context.Background(), test.want.responseShort, test.want.responseOriginal, userID)
+					require.NoError(t, err)
+				}
+			}
+			h := New(service.NewShortener(store, redirect), m)
+			h.GetUsersURLs(w, request)
+
+			res := w.Result()
+			assert.Equal(t, test.want.code, res.StatusCode)
+			defer res.Body.Close()
+
+			resBody, err := io.ReadAll(res.Body)
+			require.NoError(t, err)
+
+			if test.want.code == http.StatusOK {
+				var resp []model.UserResponse
+				err = json.Unmarshal(resBody, &resp)
+				require.NoError(t, err)
+				assert.True(t, strings.HasPrefix(resp[0].ShortURL, redirect),
+					"response body should start with %q, got %q", redirect, resp[0].ShortURL)
+				id := strings.TrimPrefix(resp[0].ShortURL, redirect)
+				assert.NotEmpty(t, id)
+				assert.Equal(t, id, test.want.responseShort)
+				assert.Equal(t, resp[0].OriginalURL, test.want.responseOriginal)
+				assert.Equal(t, test.want.contentType, res.Header.Get("content-type"))
+			}
+		})
+	}
+}
+
+func TestDeleteUsersURLs(t *testing.T) {
+	const redirect = "http://localhost:8080/"
+
+	type want struct {
+		code             int
+		responseShort    string
+		responseOriginal string
+		contentType      string
+	}
+	tests := []struct {
+		name   string
+		want   want
+		method string
+		data string
+	}{
+		{
+			name: "positive test #1",
+			want: want{
+				code:             202,
+				responseShort:    "EwHXdJfF",
+				responseOriginal: "https://practicum.yandex.ru",
+				contentType:      "application/json",
+			},
+			method: http.MethodDelete,
+			data: `["EwHXdJfF"]`,
+		},
+		{
+			name: "positive test #1",
+			want: want{
+				code:             400,
+				responseShort:    "EwHBdJfA",
+				responseOriginal: "https://practicum.yandex.ru",
+				contentType:      "text/plain",
+			},
+			method: http.MethodDelete,
+			data: `["EwHBdJfA"]`,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			userID := randomUserID(t)
+			request := httptest.NewRequest(test.method, "/api/user/urls", strings.NewReader(test.data))
+			request.Header.Set("content-type", test.want.contentType)
+			request = requestWithUserID(request, userID)
+
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			m := mocks.NewMockPinger(ctrl)
+
+			w := httptest.NewRecorder()
+			store := repository.NewMemory()
+			if test.want.code == http.StatusAccepted {
+				_, err := store.Save(context.Background(), test.want.responseShort, test.want.responseOriginal, userID)
+				require.NoError(t, err)
+			}
+			h := New(service.NewShortener(store, redirect), m)
+			h.DeleteUsersURLs(w, request)
+
+			res := w.Result()
+			assert.Equal(t, test.want.code, res.StatusCode)
+			defer res.Body.Close()
+
+			if test.want.code == http.StatusAccepted {
+				require.Eventually(t, func() bool {
+					getReq := httptest.NewRequest(http.MethodGet, "/"+test.want.responseShort, nil)
+					getReq.SetPathValue("id", test.want.responseShort)
+					getW := httptest.NewRecorder()
+					h.GetURL(getW, getReq)
+					return getW.Code == http.StatusGone
+				}, time.Second, 10*time.Millisecond)
+
+				getReq := httptest.NewRequest(http.MethodGet, "/"+test.want.responseShort, nil)
+				getReq.SetPathValue("id", test.want.responseShort)
+				getW := httptest.NewRecorder()
+				h.GetURL(getW, getReq)
+
+				getRes := getW.Result()
+				defer getRes.Body.Close()
+				assert.Equal(t, http.StatusGone, getRes.StatusCode)
+				getBody, err := io.ReadAll(getRes.Body)
+				require.NoError(t, err)
+				assert.Equal(t, http.StatusText(http.StatusGone)+"\n", string(getBody))
+			}
 		})
 	}
 }
