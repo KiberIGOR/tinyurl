@@ -511,7 +511,7 @@ func TestDeleteUsersURLs(t *testing.T) {
 		name   string
 		want   want
 		method string
-		data string
+		data   string
 	}{
 		{
 			name: "positive test #1",
@@ -522,7 +522,7 @@ func TestDeleteUsersURLs(t *testing.T) {
 				contentType:      "application/json",
 			},
 			method: http.MethodDelete,
-			data: `["EwHXdJfF"]`,
+			data:   `["EwHXdJfF"]`,
 		},
 		{
 			name: "positive test #1",
@@ -533,7 +533,7 @@ func TestDeleteUsersURLs(t *testing.T) {
 				contentType:      "text/plain",
 			},
 			method: http.MethodDelete,
-			data: `["EwHBdJfA"]`,
+			data:   `["EwHBdJfA"]`,
 		},
 	}
 	for _, test := range tests {
