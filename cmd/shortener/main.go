@@ -23,6 +23,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	// _ "net/http/pprof" // подключаем пакет pprof
 )
 
 // stub
@@ -107,6 +108,14 @@ func main() {
 	})
 	r.With(auth.AuthMiddleware).Get("/api/user/urls", h.GetUsersURLs)
 	r.With(auth.AuthMiddleware).Delete("/api/user/urls", h.DeleteUsersURLs)
+
+	// go func() {
+	// 	log.Println("pprof listening on :6060")
+	// 	if err := http.ListenAndServe(":6060", nil); err != nil {
+	// 		log.Print("pprof: ", err)
+	// 	}
+	// }()
+
 	err = http.ListenAndServe(cfg.Address, r)
 	if err != nil {
 		log.Fatal(err)

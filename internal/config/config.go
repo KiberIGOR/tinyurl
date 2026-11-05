@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	"fmt"
 	"os"
 )
 
@@ -20,9 +21,9 @@ func Parse() *Config {
 	flag.StringVar(&cfg.Address, "a", ":8080", "address and port to run server")
 	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080/", "address and port for redirect url")
 	//fileMemory.txt
-	flag.StringVar(&cfg.FileStoragePath, "f", "", "file name witch will be use for storage")
-	// ps := fmt.Sprintf("postgres://%s:%s@localhost:5432/urls?sslmode=disable","urls","urls")
-	flag.StringVar(&cfg.DataBaseDSN, "d", "", "dsn string for database setting")
+	flag.StringVar(&cfg.FileStoragePath, "f", "fileMemory.txt", "file name witch will be use for storage")
+	ps := fmt.Sprintf("postgres://%s:%s@localhost:5432/urls?sslmode=disable","urls","urls")
+	flag.StringVar(&cfg.DataBaseDSN, "d", ps, "dsn string for database setting")
 	flag.StringVar(&cfg.SecretKey, "k", "J83YbUemqzZBG1iJoNz8", "Secret Key for JWT")
 	flag.StringVar(&cfg.AuditFile, "audit-file", "", "path to audit log file")
 	flag.StringVar(&cfg.AuditURL, "audit-url", "", "URL of remote audit receiver")

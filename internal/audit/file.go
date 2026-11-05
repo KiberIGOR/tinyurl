@@ -14,6 +14,7 @@ import (
 type FileObserver struct {
 	path string
 	mu   sync.Mutex
+	file *os.File
 }
 
 func NewFileObserver(path string) (*FileObserver, error) {
@@ -21,10 +22,7 @@ func NewFileObserver(path string) (*FileObserver, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := f.Close(); err != nil {
-		return nil, err
-	}
-	return &FileObserver{path: path}, nil
+	return &FileObserver{path: path, file: f}, nil
 }
 
 func (o *FileObserver) Notify(ctx context.Context, event Event) {
@@ -38,14 +36,16 @@ func (o *FileObserver) Notify(ctx context.Context, event Event) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
-	f, err := os.OpenFile(o.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-	if err != nil {
-		logger.Log.Error("audit file: open", zap.Error(err), zap.String("path", o.path))
-		return
+	if o.file == nil {
+		f, err := os.OpenFile(o.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+		if err != nil {
+			logger.Log.Error("audit file: open", zap.Error(err), zap.String("path", o.path))
+			return
+		}
+		o.file = f
 	}
-	defer f.Close()
 
-	if _, err = f.Write(data); err != nil {
+	if _, err = o.file.Write(data); err != nil {
 		logger.Log.Error("audit file: write", zap.Error(err), zap.String("path", o.path))
 	}
 }
