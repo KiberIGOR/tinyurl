@@ -19,6 +19,7 @@ var ErrMakingJSON = errors.New("error while making JSON")
 var ErrParsingJSON = errors.New("error while parsing JSON")
 var ErrWritingJSON = errors.New("error while writing JSON")
 
+// FileMemory хранит URL в памяти и дублирует записи в JSONL-файл.
 type FileMemory struct {
 	mu         sync.RWMutex
 	byShort    map[string]string
@@ -30,6 +31,7 @@ type FileMemory struct {
 	lastUserID int
 }
 
+// NewFile открывает или создаёт файл хранилища и загружает существующие записи.
 func NewFile(fileName string) (*FileMemory, error) {
 	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {

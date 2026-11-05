@@ -1,3 +1,4 @@
+// Package handler реализует HTTP API сервиса сокращения URL (Практикум, трек Go).
 package handler
 
 import (
@@ -9,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/KiberIGOR/tinyurl/internal/audit"
 	"github.com/KiberIGOR/tinyurl/internal/auth"
 	"github.com/KiberIGOR/tinyurl/internal/logger"
 	"github.com/KiberIGOR/tinyurl/internal/model"
@@ -26,6 +28,7 @@ func respondBadRequest(res http.ResponseWriter, err error) {
 	http.Error(res, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 }
 
+// Shortener — доменная логика сокращения и получения URL (для подмены в тестах).
 type Shortener interface {
 	Shorten(ctx context.Context, originalURL string, userID int) (shortURL string, err error)
 	Resolve(ctx context.Context, id string) (originalURL string, err error)
@@ -33,19 +36,37 @@ type Shortener interface {
 	ResolveByUserID(ctx context.Context, userID int) ([]model.UserResponse, error)
 	DeleteByUserID(ctx context.Context, userID int, shortURLCh chan string)
 }
+
+// Pinger проверяет доступность бэкенда (например, PostgreSQL).
 type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
+// Handler обрабатывает HTTP-запросы к API сокращателя.
 type Handler struct {
 	shortener Shortener
 	pinger    Pinger
+	audit     *audit.Broker
 }
 
-func New(shortener Shortener, pinger Pinger) *Handler {
-	return &Handler{shortener: shortener, pinger: pinger}
+// New создаёт Handler. auditBroker может быть nil — аудит отключён.
+func New(shortener Shortener, pinger Pinger, auditBroker *audit.Broker) *Handler {
+	return &Handler{shortener: shortener, pinger: pinger, audit: auditBroker}
 }
 
+func userIDFromContext(ctx context.Context) int {
+	userID, _ := ctx.Value(auth.KeyUserID).(int)
+	return userID
+}
+
+func (h *Handler) publishAudit(ctx context.Context, event audit.Event) {
+	if h.audit == nil {
+		return
+	}
+	h.audit.Publish(ctx, event)
+}
+
+// GetURL обрабатывает GET /{id}: редирект на original URL (307) или 410, если ссылка удалена.
 func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
@@ -65,8 +86,10 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 	}
 	res.Header().Set("Location", originalURL)
 	res.WriteHeader(http.StatusTemporaryRedirect)
+	h.publishAudit(ctx, audit.NewFollowEvent(time.Now().Unix(), userIDFromContext(req.Context()), originalURL))
 }
 
+// PostURLHandler обрабатывает POST /: тело text/plain с URL, ответ — полный short URL (201/409).
 func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
@@ -103,9 +126,12 @@ func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(status)
 	if _, err = res.Write([]byte(shortURL)); err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
+	h.publishAudit(ctx, audit.NewShortenEvent(time.Now().Unix(), userID, string(body)))
 }
 
+// PostJSONURLHandler обрабатывает POST /api/shorten: JSON {"url":"..."} → {"result":"..."}.
 func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
@@ -153,9 +179,12 @@ func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request)
 	res.WriteHeader(status)
 	if _, err = res.Write(resp); err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
+	h.publishAudit(ctx, audit.NewShortenEvent(time.Now().Unix(), userID, bodyReq.URL))
 }
 
+// GetPingHandler обрабатывает GET /ping: 200, если Pinger.Ping успешен.
 func (h *Handler) GetPingHandler(res http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
@@ -167,6 +196,7 @@ func (h *Handler) GetPingHandler(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusOK)
 }
 
+// PostBatchHandler обрабатывает POST /api/shorten/batch: массив пар correlation_id / original_url.
 func (h *Handler) PostBatchHandler(res http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
@@ -213,6 +243,7 @@ func (h *Handler) PostBatchHandler(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// GetUsersURLs обрабатывает GET /api/user/urls: JSON списка ссылок пользователя (200/204/401).
 func (h *Handler) GetUsersURLs(res http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
@@ -243,6 +274,7 @@ func (h *Handler) GetUsersURLs(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// DeleteUsersURLs обрабатывает DELETE /api/user/urls: JSON-массив short id, ответ 202 Accepted.
 func (h *Handler) DeleteUsersURLs(res http.ResponseWriter, req *http.Request) {
 	userID, ok := req.Context().Value(auth.KeyUserID).(int)
 	if !ok || userID <= 0 {

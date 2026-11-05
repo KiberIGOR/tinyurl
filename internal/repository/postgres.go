@@ -13,10 +13,12 @@ import (
 var ErrConflict = errors.New("original URL already exists")
 var ErrNoContent = errors.New("no content")
 
+// DB — PostgreSQL-реализация хранилища URL.
 type DB struct {
 	db *pgxpool.Pool
 }
 
+// NewDB создаёт обёртку над пулом соединений pgx.
 func NewDB(db *pgxpool.Pool) *DB {
 	return &DB{db: db}
 }
