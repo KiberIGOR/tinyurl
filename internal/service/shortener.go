@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sync"
 
 	"github.com/KiberIGOR/tinyurl/internal/logger"
 	"github.com/KiberIGOR/tinyurl/internal/model"
@@ -151,12 +152,41 @@ func (s *Shortener) BatchShorten(ctx context.Context, batch []model.BatchRequest
 	return out, nil
 }
 
+var (
+	idRandPool = sync.Pool{
+		New: func() any {
+			b := make([]byte, 6)
+			return &b
+		},
+	}
+	idEncPool = sync.Pool{
+		New: func() any {
+			b := make([]byte, base64.URLEncoding.EncodedLen(6))
+			return &b
+		},
+	}
+)
+
 func generateID() (string, error) {
-	b := make([]byte, 6)
+	randBuf := idRandPool.Get().(*[]byte)
+	b := (*randBuf)[:6]
 	if _, err := rand.Read(b); err != nil {
+		idRandPool.Put(randBuf)
 		return "", err
 	}
-	return base64.URLEncoding.EncodeToString(b)[:8], nil
+
+	encBuf := idEncPool.Get().(*[]byte)
+	encLen := base64.URLEncoding.EncodedLen(len(b))
+	enc := (*encBuf)[:encLen]
+	base64.URLEncoding.Encode(enc, b)
+	id := string(enc)
+	if len(id) > 8 {
+		id = id[:8]
+	}
+
+	idRandPool.Put(randBuf)
+	idEncPool.Put(encBuf)
+	return id, nil
 }
 
 func (s *Shortener) ResolveByUserID(ctx context.Context, userID int) ([]model.UserResponse, error) {
@@ -182,7 +212,7 @@ func (s *Shortener) ResolveByUserID(ctx context.Context, userID int) ([]model.Us
 }
 
 func (s *Shortener) DeleteByUserID(ctx context.Context, userID int, shortURLCh chan string) {
-	shortURLs := []string{}
+	shortURLs := make([]string, 0, cap(shortURLCh))
 	for item := range shortURLCh {
 		shortURLs = append(shortURLs, item)
 	}
