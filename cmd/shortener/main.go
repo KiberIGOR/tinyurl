@@ -8,6 +8,7 @@ import (
 
 	"log"
 
+	"github.com/KiberIGOR/tinyurl/internal/audit"
 	"github.com/KiberIGOR/tinyurl/internal/auth"
 	"github.com/KiberIGOR/tinyurl/internal/compress"
 	"github.com/KiberIGOR/tinyurl/internal/config"
@@ -22,6 +23,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	// _ "net/http/pprof" // подключаем пакет pprof
 )
 
 // stub
@@ -75,7 +77,20 @@ func main() {
 		pinger = nilPinger{}
 	}
 	svc := service.NewShortener(store, cfg.BaseURL)
-	h := handler.New(svc, pinger)
+
+	auditBroker := audit.NewBroker()
+	if cfg.AuditFile != "" {
+		fileObserver, err := audit.NewFileObserver(cfg.AuditFile)
+		if err != nil {
+			log.Fatal("audit file: ", err)
+		}
+		auditBroker.Subscribe(fileObserver)
+	}
+	if cfg.AuditURL != "" {
+		auditBroker.Subscribe(audit.NewHTTPObserver(cfg.AuditURL, nil))
+	}
+
+	h := handler.New(svc, pinger, auditBroker)
 
 	auth.Initialize(service.NewAuthService(userRepo, cfg.SecretKey))
 
@@ -93,6 +108,14 @@ func main() {
 	})
 	r.With(auth.AuthMiddleware).Get("/api/user/urls", h.GetUsersURLs)
 	r.With(auth.AuthMiddleware).Delete("/api/user/urls", h.DeleteUsersURLs)
+
+	// go func() {
+	// 	log.Println("pprof listening on :6060")
+	// 	if err := http.ListenAndServe(":6060", nil); err != nil {
+	// 		log.Print("pprof: ", err)
+	// 	}
+	// }()
+
 	err = http.ListenAndServe(cfg.Address, r)
 	if err != nil {
 		log.Fatal(err)

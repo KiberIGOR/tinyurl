@@ -84,7 +84,7 @@ func TestGetUrlHandler(t *testing.T) {
 					require.NoError(t, err)
 				}
 			}
-			h := New(service.NewShortener(store, "http://localhost:8080/"), m)
+			h := New(service.NewShortener(store, "http://localhost:8080/"), m, nil)
 
 			request := httptest.NewRequest(test.method, "/"+test.path, nil)
 			request.SetPathValue("id", test.path)
@@ -167,7 +167,7 @@ func TestPostUrlHandler(t *testing.T) {
 			store, err := repository.NewFile("fileMemoryTest.txt")
 			require.NoError(t, err)
 			defer store.Close()
-			h := New(service.NewShortener(store, redirect), m)
+			h := New(service.NewShortener(store, redirect), m, nil)
 			h.PostURLHandler(w, request)
 
 			res := w.Result()
@@ -268,7 +268,7 @@ func TestPostJsonUrlHandler(t *testing.T) {
 			store, err := repository.NewFile("fileMemoryTest.txt")
 			require.NoError(t, err)
 			defer store.Close()
-			h := New(service.NewShortener(store, redirect), m)
+			h := New(service.NewShortener(store, redirect), m, nil)
 			h.PostJSONURLHandler(w, request)
 
 			res := w.Result()
@@ -372,7 +372,7 @@ func TestPostBatchHandler(t *testing.T) {
 			store, err := repository.NewFile("fileMemoryTest.txt")
 			require.NoError(t, err)
 			defer store.Close()
-			h := New(service.NewShortener(store, redirect), m)
+			h := New(service.NewShortener(store, redirect), m, nil)
 			h.PostBatchHandler(w, request)
 
 			res := w.Result()
@@ -472,7 +472,7 @@ func TestGetUsersURLs(t *testing.T) {
 					require.NoError(t, err)
 				}
 			}
-			h := New(service.NewShortener(store, redirect), m)
+			h := New(service.NewShortener(store, redirect), m, nil)
 			h.GetUsersURLs(w, request)
 
 			res := w.Result()
@@ -553,7 +553,7 @@ func TestDeleteUsersURLs(t *testing.T) {
 				_, err := store.Save(context.Background(), test.want.responseShort, test.want.responseOriginal, userID)
 				require.NoError(t, err)
 			}
-			h := New(service.NewShortener(store, redirect), m)
+			h := New(service.NewShortener(store, redirect), m, nil)
 			h.DeleteUsersURLs(w, request)
 
 			res := w.Result()

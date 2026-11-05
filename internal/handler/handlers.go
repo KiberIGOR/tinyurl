@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/KiberIGOR/tinyurl/internal/audit"
 	"github.com/KiberIGOR/tinyurl/internal/auth"
 	"github.com/KiberIGOR/tinyurl/internal/logger"
 	"github.com/KiberIGOR/tinyurl/internal/model"
@@ -40,10 +41,23 @@ type Pinger interface {
 type Handler struct {
 	shortener Shortener
 	pinger    Pinger
+	audit     *audit.Broker
 }
 
-func New(shortener Shortener, pinger Pinger) *Handler {
-	return &Handler{shortener: shortener, pinger: pinger}
+func New(shortener Shortener, pinger Pinger, auditBroker *audit.Broker) *Handler {
+	return &Handler{shortener: shortener, pinger: pinger, audit: auditBroker}
+}
+
+func userIDFromContext(ctx context.Context) int {
+	userID, _ := ctx.Value(auth.KeyUserID).(int)
+	return userID
+}
+
+func (h *Handler) publishAudit(ctx context.Context, event audit.Event) {
+	if h.audit == nil {
+		return
+	}
+	h.audit.Publish(ctx, event)
 }
 
 func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
@@ -65,6 +79,7 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 	}
 	res.Header().Set("Location", originalURL)
 	res.WriteHeader(http.StatusTemporaryRedirect)
+	h.publishAudit(ctx, audit.NewFollowEvent(time.Now().Unix(), userIDFromContext(req.Context()), originalURL))
 }
 
 func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
@@ -103,7 +118,9 @@ func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(status)
 	if _, err = res.Write([]byte(shortURL)); err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
+	h.publishAudit(ctx, audit.NewShortenEvent(time.Now().Unix(), userID, string(body)))
 }
 
 func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request) {
@@ -153,7 +170,9 @@ func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request)
 	res.WriteHeader(status)
 	if _, err = res.Write(resp); err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
+	h.publishAudit(ctx, audit.NewShortenEvent(time.Now().Unix(), userID, bodyReq.URL))
 }
 
 func (h *Handler) GetPingHandler(res http.ResponseWriter, req *http.Request) {

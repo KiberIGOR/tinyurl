@@ -11,6 +11,8 @@ type Config struct {
 	FileStoragePath string
 	DataBaseDSN     string
 	SecretKey       string
+	AuditFile       string
+	AuditURL        string
 }
 
 func Parse() *Config {
@@ -22,6 +24,8 @@ func Parse() *Config {
 	// ps := fmt.Sprintf("postgres://%s:%s@localhost:5432/urls?sslmode=disable","urls","urls")
 	flag.StringVar(&cfg.DataBaseDSN, "d", "", "dsn string for database setting")
 	flag.StringVar(&cfg.SecretKey, "k", "J83YbUemqzZBG1iJoNz8", "Secret Key for JWT")
+	flag.StringVar(&cfg.AuditFile, "audit-file", "", "path to audit log file")
+	flag.StringVar(&cfg.AuditURL, "audit-url", "", "URL of remote audit receiver")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("SERVER_ADDRESS"); envRunAddr != "" {
@@ -38,6 +42,14 @@ func Parse() *Config {
 
 	if envRunAddr := os.Getenv("DATABASE_DSN"); envRunAddr != "" {
 		cfg.DataBaseDSN = envRunAddr
+	}
+
+	if envRunAddr := os.Getenv("AUDIT_FILE"); envRunAddr != "" {
+		cfg.AuditFile = envRunAddr
+	}
+
+	if envRunAddr := os.Getenv("AUDIT_URL"); envRunAddr != "" {
+		cfg.AuditURL = envRunAddr
 	}
 
 	return cfg
