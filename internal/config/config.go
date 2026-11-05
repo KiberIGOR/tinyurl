@@ -1,3 +1,4 @@
+// Package config загружает параметры сервера из флагов и переменных окружения.
 package config
 
 import (
@@ -5,7 +6,9 @@ import (
 	"os"
 )
 
+// Config — параметры запуска HTTP-сервера и хранилища.
 type Config struct {
+	// Address — адрес прослушивания (флаг -a, env SERVER_ADDRESS).
 	Address         string
 	BaseURL         string
 	FileStoragePath string
@@ -15,6 +18,7 @@ type Config struct {
 	AuditURL        string
 }
 
+// Parse читает флаги командной строки и переопределяет их значениями из env.
 func Parse() *Config {
 	cfg := &Config{}
 	flag.StringVar(&cfg.Address, "a", ":8080", "address and port to run server")

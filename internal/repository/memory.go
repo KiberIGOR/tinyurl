@@ -1,3 +1,4 @@
+// Package repository реализует хранение сокращённых URL (память, файл, PostgreSQL).
 package repository
 
 import (
@@ -7,10 +8,16 @@ import (
 	"sync"
 )
 
+// ErrAlreadyExist возвращается при коллизии primary key short_url.
 var ErrAlreadyExist = errors.New("short URL already exist")
+
+// ErrNotFound возвращается, если запись не найдена.
 var ErrNotFound = errors.New("URL not found")
+
+// ErrDeleted возвращается при обращении к помеченной удалённой ссылке.
 var ErrDeleted = errors.New("URL deleted")
 
+// Memory — in-memory реализация URLRepository.
 type Memory struct {
 	mu         sync.RWMutex
 	byShort    map[string]string // short_url → original_url
@@ -19,6 +26,7 @@ type Memory struct {
 	lastUserID int
 }
 
+// NewMemory создаёт пустое in-memory хранилище.
 func NewMemory() *Memory {
 	return &Memory{
 		byShort: make(map[string]string),

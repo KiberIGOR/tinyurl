@@ -1,11 +1,12 @@
+// Package model содержит DTO HTTP API и формата файлового хранилища.
 package model
 
-// Request описывает запрос пользователя.
+// Request — тело POST /api/shorten.
 type Request struct {
 	URL string `json:"url"`
 }
 
-// ResponsePayload описывает ответ
+// Response — ответ POST /api/shorten.
 type Response struct {
 	URL string `json:"result"`
 }
@@ -30,9 +31,11 @@ type BatchResponse struct {
 	ShortURL string `json:"short_url"`
 }
 
+// UserResponse — элемент списка GET /api/user/urls.
 type UserResponse struct {
 	OriginalURL string `json:"original_url"`
 	ShortURL    string `json:"short_url"`
 }
 
+// DeleteRequest — элемент JSON-массива в DELETE /api/user/urls (short id).
 type DeleteRequest string

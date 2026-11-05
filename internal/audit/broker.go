@@ -1,3 +1,4 @@
+// Package audit реализует асинхронную запись событий (паттерн «Наблюдатель»).
 package audit
 
 import "context"
