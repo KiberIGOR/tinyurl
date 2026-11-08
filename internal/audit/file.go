@@ -37,7 +37,8 @@ func (o *FileObserver) Notify(ctx context.Context, event Event) {
 	defer o.mu.Unlock()
 
 	if o.file == nil {
-		f, err := os.OpenFile(o.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+		var f *os.File
+		f, err = os.OpenFile(o.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 		if err != nil {
 			logger.Log.Error("audit file: open", zap.Error(err), zap.String("path", o.path))
 			return

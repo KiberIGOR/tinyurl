@@ -80,7 +80,8 @@ func main() {
 
 	auditBroker := audit.NewBroker()
 	if cfg.AuditFile != "" {
-		fileObserver, err := audit.NewFileObserver(cfg.AuditFile)
+		var fileObserver *audit.FileObserver
+		fileObserver, err = audit.NewFileObserver(cfg.AuditFile)
 		if err != nil {
 			log.Fatal("audit file: ", err)
 		}
