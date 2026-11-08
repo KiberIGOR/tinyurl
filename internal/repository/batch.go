@@ -1,6 +1,6 @@
 package repository
 
-// URLEntry — пара short_url / original_url для пакетной записи в хранилище.
+// URLEntry — пара short_url / original_url для записи в хранилище.
 type URLEntry struct {
 	ShortURL    string
 	OriginalURL string

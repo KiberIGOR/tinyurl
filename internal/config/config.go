@@ -1,3 +1,4 @@
+// Package config загружает параметры сервера из флагов и переменных окружения.
 package config
 
 import (
@@ -5,14 +6,19 @@ import (
 	"os"
 )
 
+// Config — параметры запуска HTTP-сервера и хранилища.
 type Config struct {
+	// Address — адрес прослушивания (флаг -a, env SERVER_ADDRESS).
 	Address         string
 	BaseURL         string
 	FileStoragePath string
 	DataBaseDSN     string
 	SecretKey       string
+	AuditFile       string
+	AuditURL        string
 }
 
+// Parse читает флаги командной строки и переопределяет их значениями из env.
 func Parse() *Config {
 	cfg := &Config{}
 	flag.StringVar(&cfg.Address, "a", ":8080", "address and port to run server")
@@ -22,6 +28,8 @@ func Parse() *Config {
 	// ps := fmt.Sprintf("postgres://%s:%s@localhost:5432/urls?sslmode=disable","urls","urls")
 	flag.StringVar(&cfg.DataBaseDSN, "d", "", "dsn string for database setting")
 	flag.StringVar(&cfg.SecretKey, "k", "J83YbUemqzZBG1iJoNz8", "Secret Key for JWT")
+	flag.StringVar(&cfg.AuditFile, "audit-file", "", "path to audit log file")
+	flag.StringVar(&cfg.AuditURL, "audit-url", "", "URL of remote audit receiver")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("SERVER_ADDRESS"); envRunAddr != "" {
@@ -38,6 +46,14 @@ func Parse() *Config {
 
 	if envRunAddr := os.Getenv("DATABASE_DSN"); envRunAddr != "" {
 		cfg.DataBaseDSN = envRunAddr
+	}
+
+	if envRunAddr := os.Getenv("AUDIT_FILE"); envRunAddr != "" {
+		cfg.AuditFile = envRunAddr
+	}
+
+	if envRunAddr := os.Getenv("AUDIT_URL"); envRunAddr != "" {
+		cfg.AuditURL = envRunAddr
 	}
 
 	return cfg

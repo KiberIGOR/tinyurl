@@ -8,15 +8,18 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
+// UserRepository выделяет идентификаторы пользователей для JWT.
 type UserRepository interface {
 	GetLastID(ctx context.Context) int
 }
 
+// AuthService выпускает и проверяет JWT в cookie Token.
 type AuthService struct {
 	repo      UserRepository
 	secretKey string
 }
 
+// NewAuthService создаёт сервис авторизации.
 func NewAuthService(repo UserRepository, key string) *AuthService {
 	return &AuthService{
 		repo:      repo,
@@ -31,6 +34,7 @@ type Claims struct {
 	UserID int
 }
 
+// TokenExp — время жизни JWT в cookie.
 const TokenExp = time.Hour * 24
 
 // BuildJWTString создаёт токен и возвращает его в виде строки.

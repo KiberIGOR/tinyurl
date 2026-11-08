@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// SetCookieMiddleware выставляет cookie Token новому пользователю или читает user id из JWT.
 func SetCookieMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("Token")

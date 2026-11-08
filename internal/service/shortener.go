@@ -1,3 +1,4 @@
+// Package service содержит бизнес-логику сокращения и управления URL.
 package service
 
 import (
@@ -7,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sync"
 
 	"github.com/KiberIGOR/tinyurl/internal/logger"
 	"github.com/KiberIGOR/tinyurl/internal/model"
@@ -14,12 +16,22 @@ import (
 	"go.uber.org/zap"
 )
 
+// ErrNotFound возвращается, если short URL не найден.
 var ErrNotFound = errors.New("URL not found")
+
+// ErrGone возвращается, если URL помечен как удалённый.
 var ErrGone = errors.New("URL deleted")
+
+// ErrCollision возвращается при исчерпании попыток генерации уникального id.
 var ErrCollision = errors.New("not found correct id for URL(collision)")
+
+// ErrConflict возвращается, если original URL уже существует у другого short id.
 var ErrConflict = errors.New("original URL already exists")
+
+// ErrNoContent возвращается, если у пользователя нет сохранённых URL.
 var ErrNoContent = errors.New("URLs not found")
 
+// URLRepository — хранилище сокращённых ссылок.
 type URLRepository interface {
 	Get(ctx context.Context, id string) (string, error)
 	Save(ctx context.Context, id, originalURL string, userID int) (string, error)
@@ -28,11 +40,13 @@ type URLRepository interface {
 	DeleteByShortURLs(ctx context.Context, userID int, array []string) error
 }
 
+// Shortener создаёт и разрешает короткие ссылки относительно baseURL.
 type Shortener struct {
 	repo    URLRepository
 	baseURL string
 }
 
+// NewShortener создаёт сервис сокращения URL.
 func NewShortener(repo URLRepository, baseURL string) *Shortener {
 	return &Shortener{
 		repo:    repo,
@@ -40,6 +54,7 @@ func NewShortener(repo URLRepository, baseURL string) *Shortener {
 	}
 }
 
+// Shorten сохраняет originalURL и возвращает полный short URL (baseURL + id).
 func (s *Shortener) Shorten(ctx context.Context, originalURL string, userID int) (string, error) {
 	const n int = 5
 	for i := 0; i < n; i++ {
@@ -66,6 +81,7 @@ func (s *Shortener) Shorten(ctx context.Context, originalURL string, userID int)
 	return "", ErrCollision
 }
 
+// Resolve возвращает original URL по идентификатору short path.
 func (s *Shortener) Resolve(ctx context.Context, id string) (string, error) {
 	originalURL, err := s.repo.Get(ctx, id)
 	if err != nil {
@@ -80,6 +96,7 @@ func (s *Shortener) Resolve(ctx context.Context, id string) (string, error) {
 	return originalURL, nil
 }
 
+// BatchShorten сокращает набор URL одним вызовом хранилища.
 func (s *Shortener) BatchShorten(ctx context.Context, batch []model.BatchRequest, userID int) ([]model.BatchResponse, error) {
 	const maxAttempts = 5
 
@@ -151,14 +168,44 @@ func (s *Shortener) BatchShorten(ctx context.Context, batch []model.BatchRequest
 	return out, nil
 }
 
+var (
+	idRandPool = sync.Pool{
+		New: func() any {
+			b := make([]byte, 6)
+			return &b
+		},
+	}
+	idEncPool = sync.Pool{
+		New: func() any {
+			b := make([]byte, base64.URLEncoding.EncodedLen(6))
+			return &b
+		},
+	}
+)
+
 func generateID() (string, error) {
-	b := make([]byte, 6)
+	randBuf := idRandPool.Get().(*[]byte)
+	b := (*randBuf)[:6]
 	if _, err := rand.Read(b); err != nil {
+		idRandPool.Put(randBuf)
 		return "", err
 	}
-	return base64.URLEncoding.EncodeToString(b)[:8], nil
+
+	encBuf := idEncPool.Get().(*[]byte)
+	encLen := base64.URLEncoding.EncodedLen(len(b))
+	enc := (*encBuf)[:encLen]
+	base64.URLEncoding.Encode(enc, b)
+	id := string(enc)
+	if len(id) > 8 {
+		id = id[:8]
+	}
+
+	idRandPool.Put(randBuf)
+	idEncPool.Put(encBuf)
+	return id, nil
 }
 
+// ResolveByUserID возвращает все активные ссылки пользователя с полным short URL.
 func (s *Shortener) ResolveByUserID(ctx context.Context, userID int) ([]model.UserResponse, error) {
 	urls, err := s.repo.GetURLsByUserID(ctx, userID)
 	if err != nil {
@@ -181,8 +228,9 @@ func (s *Shortener) ResolveByUserID(ctx context.Context, userID int) ([]model.Us
 	return out, nil
 }
 
+// DeleteByUserID помечает short URL пользователя удалёнными (асинхронный сценарий).
 func (s *Shortener) DeleteByUserID(ctx context.Context, userID int, shortURLCh chan string) {
-	shortURLs := []string{}
+	shortURLs := make([]string, 0, cap(shortURLCh))
 	for item := range shortURLCh {
 		shortURLs = append(shortURLs, item)
 	}
