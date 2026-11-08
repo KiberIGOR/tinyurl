@@ -5,11 +5,11 @@ import "testing"
 func TestResetableStructReset(t *testing.T) {
 	str := "x"
 	s := &ResetableStruct{
-		I:    10,
-		Str:  "hello",
-		StrP: &str,
-		S:    []int{1, 2},
-		M:    map[string]string{"a": "b"},
+		I:     10,
+		Str:   "hello",
+		StrP:  &str,
+		S:     []int{1, 2},
+		M:     map[string]string{"a": "b"},
 		Child: &ResetableStruct{I: 99},
 	}
 	s.Reset()
