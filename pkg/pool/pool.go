@@ -41,7 +41,7 @@ func (p *Pool[T, P]) Get() P {
 
 // Put возвращает объект в пул после сброса состояния.
 func (p *Pool[T, P]) Put(v P) {
-	if any(v) == nil {
+	if v == nil {
 		return
 	}
 	v.Reset()
