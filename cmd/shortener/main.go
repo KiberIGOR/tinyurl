@@ -48,7 +48,6 @@ func (nilPinger) Ping(ctx context.Context) error {
 }
 
 func main() {
-	// go build -ldflags "-X main.buildVersion=1.0 -X main.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o shortener ./cmd/shortener
 	fmt.Println("Build version:", buildLabel(buildVersion))
 	fmt.Println("Build date:", buildLabel(buildDate))
 	fmt.Println("Build commit:", buildLabel(buildCommit))

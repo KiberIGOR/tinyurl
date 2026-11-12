@@ -57,14 +57,12 @@ func main() {
 			continue
 		}
 
-		for i, file := range pkg.Syntax {
-			if i < len(pkg.GoFiles) {
-				base := filepath.Base(pkg.GoFiles[i])
-				if strings.HasSuffix(base, "_test.go") || base == "reset.gen.go" {
-					continue
-				}
+		for _, file := range pkg.Syntax {
+			base := sourceBaseName(pkg.Fset, file)
+			if strings.HasSuffix(base, "_test.go") || base == "reset.gen.go" {
+				continue
 			}
-			_ = file
+			dir := filepath.Dir(pkg.Fset.Position(file.Pos()).Filename)
 			for _, decl := range file.Decls {
 				gen, ok := decl.(*ast.GenDecl)
 				if !ok || gen.Tok != token.TYPE {
@@ -87,7 +85,6 @@ func main() {
 					if !ok {
 						continue
 					}
-					dir := filepath.Dir(pkg.GoFiles[0])
 					jobsByDir[dir] = append(jobsByDir[dir], resetJob{dir: dir, name: name, named: named})
 				}
 			}
@@ -103,10 +100,21 @@ func main() {
 }
 
 func shouldSkipPackage(pkg *packages.Package) bool {
-	if pkg.PkgPath == "github.com/KiberIGOR/tinyurl/cmd/reset" {
+	if strings.HasSuffix(pkg.PkgPath, "/vendor") {
 		return true
 	}
-	return strings.HasSuffix(pkg.PkgPath, "/vendor") || pkg.Name == "main" && strings.Contains(pkg.PkgPath, "/cmd/reset")
+	return pkg.Name == "main" && strings.HasSuffix(pkg.PkgPath, "/cmd/reset")
+}
+
+func sourceBaseName(fset *token.FileSet, file *ast.File) string {
+	if fset == nil || file == nil {
+		return ""
+	}
+	pos := fset.Position(file.Pos())
+	if pos.Filename == "" {
+		return ""
+	}
+	return filepath.Base(pos.Filename)
 }
 
 func isStructType(ts *ast.TypeSpec, info *types.Info) bool {
@@ -164,99 +172,62 @@ func writeResetMethod(buf *bytes.Buffer, named *types.Named, pkg *types.Package)
 
 	for i := 0; i < st.NumFields(); i++ {
 		field := st.Field(i)
-		emitReset(buf, "s", field.Name(), field.Type(), 1, pkg)
+		lvalue := "s." + field.Name()
+		emitValueReset(buf, lvalue, field.Type(), 1, pkg)
 	}
 
 	buf.WriteString("}\n\n")
 }
 
-func emitReset(buf *bytes.Buffer, recv, name string, t types.Type, depth int, pkg *types.Package) {
+func emitValueReset(buf *bytes.Buffer, lvalue string, t types.Type, depth int, pkg *types.Package) {
 	indent := strings.Repeat("\t", depth)
-	qual := recv + "." + name
 
 	switch u := types.Unalias(t).(type) {
 	case *types.Basic:
-		fmt.Fprintf(buf, "%s%s = %s\n", indent, qual, zeroLiteral(u))
+		fmt.Fprintf(buf, "%s%s = %s\n", indent, lvalue, zeroLiteral(u))
 	case *types.Slice:
-		fmt.Fprintf(buf, "%s%s = %s[:0]\n", indent, qual, qual)
+		fmt.Fprintf(buf, "%s%s = %s[:0]\n", indent, lvalue, lvalue)
 	case *types.Map:
-		fmt.Fprintf(buf, "%sclear(%s)\n", indent, qual)
+		fmt.Fprintf(buf, "%sclear(%s)\n", indent, lvalue)
 	case *types.Pointer:
-		emitPointerReset(buf, qual, u.Elem(), depth, pkg)
+		emitPointerTargetReset(buf, lvalue, u.Elem(), depth, pkg)
 	case *types.Struct:
-		emitStructReset(buf, recv, name, u, depth)
+		emitStructLvalueReset(buf, lvalue, u, depth)
 	case *types.Named:
 		if _, ok := u.Underlying().(*types.Struct); ok {
-			emitNamedStructReset(buf, qual, u, depth)
+			emitNamedLvalueReset(buf, lvalue, u, depth)
 			return
 		}
-		under := u.Underlying()
-		switch ut := under.(type) {
-		case *types.Slice:
-			fmt.Fprintf(buf, "%s%s = %s[:0]\n", indent, qual, qual)
-		case *types.Map:
-			fmt.Fprintf(buf, "%sclear(%s)\n", indent, qual)
-		case *types.Basic:
-			fmt.Fprintf(buf, "%s%s = %s\n", indent, qual, zeroLiteral(ut))
-		default:
-			if hasReset(u) {
-				fmt.Fprintf(buf, "%sif resetter, ok := any(%s).(interface{ Reset() }); ok {\n", indent, qual)
-				fmt.Fprintf(buf, "%s\tresetter.Reset()\n", indent)
-				fmt.Fprintf(buf, "%s}\n", indent)
-			}
-		}
+		emitValueReset(buf, lvalue, u.Underlying(), depth, pkg)
 	case *types.Interface:
-		fmt.Fprintf(buf, "%s%s = nil\n", indent, qual)
+		fmt.Fprintf(buf, "%s%s = nil\n", indent, lvalue)
 	default:
-		fmt.Fprintf(buf, "%s%s = %s\n", indent, qual, zeroForType(t, pkg))
+		fmt.Fprintf(buf, "%s%s = %s\n", indent, lvalue, zeroForType(t, pkg))
 	}
 }
 
-func emitPointerReset(buf *bytes.Buffer, qual string, elem types.Type, depth int, pkg *types.Package) {
+func emitPointerTargetReset(buf *bytes.Buffer, ptrExpr string, elem types.Type, depth int, pkg *types.Package) {
 	indent := strings.Repeat("\t", depth)
 	elem = types.Unalias(elem)
 
-	switch e := elem.(type) {
-	case *types.Basic:
-		fmt.Fprintf(buf, "%sif %s != nil {\n", indent, qual)
-		fmt.Fprintf(buf, "%s\t*%s = %s\n", indent, qual, zeroLiteral(e))
+	if isStructLike(elem) || hasReset(types.NewPointer(elem)) {
+		fmt.Fprintf(buf, "%sif %s != nil {\n", indent, ptrExpr)
+		fmt.Fprintf(buf, "%s\tif resetter, ok := any(%s).(interface{ Reset() }); ok {\n", indent, ptrExpr)
+		fmt.Fprintf(buf, "%s\t\tresetter.Reset()\n", indent)
+		fmt.Fprintf(buf, "%s\t}\n", indent)
 		fmt.Fprintf(buf, "%s}\n", indent)
-	case *types.Slice:
-		fmt.Fprintf(buf, "%sif %s != nil {\n", indent, qual)
-		fmt.Fprintf(buf, "%s\t*%s = (*%s)[:0]\n", indent, qual, qual)
-		fmt.Fprintf(buf, "%s}\n", indent)
-	case *types.Map:
-		fmt.Fprintf(buf, "%sif %s != nil {\n", indent, qual)
-		fmt.Fprintf(buf, "%s\tclear(*%s)\n", indent, qual)
-		fmt.Fprintf(buf, "%s}\n", indent)
-	case *types.Pointer:
-		fmt.Fprintf(buf, "%sif %s != nil {\n", indent, qual)
-		emitPointerReset(buf, "*"+qual, e.Elem(), depth+1, pkg)
-		fmt.Fprintf(buf, "%s}\n", indent)
-	case *types.Struct, *types.Named:
-		if isStructLike(elem) {
-			fmt.Fprintf(buf, "%sif %s != nil {\n", indent, qual)
-			fmt.Fprintf(buf, "%s\tif resetter, ok := any(%s).(interface{ Reset() }); ok {\n", indent, qual)
-			fmt.Fprintf(buf, "%s\t\tresetter.Reset()\n", indent)
-			fmt.Fprintf(buf, "%s\t}\n", indent)
-			fmt.Fprintf(buf, "%s}\n", indent)
-			return
-		}
-		fmt.Fprintf(buf, "%sif %s != nil {\n", indent, qual)
-		fmt.Fprintf(buf, "%s\t*%s = %s\n", indent, qual, zeroValueExpr(elem, pkg))
+		return
+	}
+
+	switch elem.(type) {
+	case *types.Basic, *types.Slice, *types.Map, *types.Pointer:
+		fmt.Fprintf(buf, "%sif %s != nil {\n", indent, ptrExpr)
+		emitValueReset(buf, "*"+ptrExpr, elem, depth+1, pkg)
 		fmt.Fprintf(buf, "%s}\n", indent)
 	default:
-		if hasReset(types.NewPointer(elem)) || isStructLike(elem) {
-			fmt.Fprintf(buf, "%sif %s != nil {\n", indent, qual)
-			fmt.Fprintf(buf, "%s\tif resetter, ok := any(%s).(interface{ Reset() }); ok {\n", indent, qual)
-			fmt.Fprintf(buf, "%s\t\tresetter.Reset()\n", indent)
-			fmt.Fprintf(buf, "%s\t}\n", indent)
-			fmt.Fprintf(buf, "%s}\n", indent)
-		} else {
-			fmt.Fprintf(buf, "%sif %s != nil {\n", indent, qual)
-			fmt.Fprintf(buf, "%s\t*%s = %s\n", indent, qual, zeroValueExpr(elem, pkg))
-			fmt.Fprintf(buf, "%s}\n", indent)
-		}
+		fmt.Fprintf(buf, "%sif %s != nil {\n", indent, ptrExpr)
+		fmt.Fprintf(buf, "%s\t*%s = %s\n", indent, ptrExpr, zeroValueExpr(elem, pkg))
+		fmt.Fprintf(buf, "%s}\n", indent)
 	}
 }
 
@@ -282,29 +253,28 @@ func zeroValueExpr(t types.Type, pkg *types.Package) string {
 	return types.TypeString(t, types.RelativeTo(pkg))
 }
 
-func emitStructReset(buf *bytes.Buffer, recv, name string, st *types.Struct, depth int) {
-	qual := recv + "." + name
+func emitStructLvalueReset(buf *bytes.Buffer, lvalue string, st *types.Struct, depth int) {
 	if hasReset(types.NewPointer(st)) {
 		indent := strings.Repeat("\t", depth)
-		fmt.Fprintf(buf, "%sif resetter, ok := any(&%s).(interface{ Reset() }); ok {\n", indent, qual)
+		fmt.Fprintf(buf, "%sif resetter, ok := any(&%s).(interface{ Reset() }); ok {\n", indent, lvalue)
 		fmt.Fprintf(buf, "%s\tresetter.Reset()\n", indent)
 		fmt.Fprintf(buf, "%s}\n", indent)
 		return
 	}
 	indent := strings.Repeat("\t", depth)
-	fmt.Fprintf(buf, "%s%s = %s{}\n", indent, qual, typeString(st, nil))
+	fmt.Fprintf(buf, "%s%s = %s{}\n", indent, lvalue, typeString(st, nil))
 }
 
-func emitNamedStructReset(buf *bytes.Buffer, qual string, named *types.Named, depth int) {
+func emitNamedLvalueReset(buf *bytes.Buffer, lvalue string, named *types.Named, depth int) {
 	if hasReset(types.NewPointer(named)) {
 		indent := strings.Repeat("\t", depth)
-		fmt.Fprintf(buf, "%sif resetter, ok := any(%s).(interface{ Reset() }); ok {\n", indent, qual)
+		fmt.Fprintf(buf, "%sif resetter, ok := any(%s).(interface{ Reset() }); ok {\n", indent, lvalue)
 		fmt.Fprintf(buf, "%s\tresetter.Reset()\n", indent)
 		fmt.Fprintf(buf, "%s}\n", indent)
 		return
 	}
 	indent := strings.Repeat("\t", depth)
-	fmt.Fprintf(buf, "%s%s = %s{}\n", indent, qual, named.Obj().Name())
+	fmt.Fprintf(buf, "%s%s = %s{}\n", indent, lvalue, named.Obj().Name())
 }
 
 func hasReset(t types.Type) bool {

@@ -43,6 +43,33 @@ git fetch template && git checkout template/v2 .github
 - **Hexagonal Architecture**
 - **Layered Architecture**
 
+## Сборка shortener (версия / дата / коммит)
+
+Переменные `buildVersion`, `buildDate`, `buildCommit` в `cmd/shortener` задаются через `-ldflags` при сборке. Примеры — в `Makefile`:
+
+```bash
+make shortener
+# или с явной версией:
+make shortener VERSION=1.0
+```
+
+Вручную:
+
+```bash
+go build -buildvcs=false \
+  -ldflags "-X main.buildVersion=dev \
+    -X main.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+    -X main.buildCommit=$(git rev-parse --short HEAD)" \
+  -o shortener ./cmd/shortener
+```
+
+Генерация `Reset()` для структур с `// generate:reset`:
+
+```bash
+make reset
+# или: go run ./cmd/reset
+```
+
 ## Бенчмарки
 
 ```bash
