@@ -24,6 +24,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"golang.org/x/crypto/acme/autocert"
 	// _ "net/http/pprof" // подключаем пакет pprof
 )
 
@@ -135,10 +136,27 @@ func main() {
 	// 	}
 	// }()
 
-	err = http.ListenAndServe(cfg.Address, r)
+	err = runServer(cfg.Address, r, cfg.EnableHTTPS)
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func runServer(addr string, handler http.Handler, enableHTTPS bool) error {
+	if !enableHTTPS {
+		return http.ListenAndServe(addr, handler)
+	}
+
+	manager := &autocert.Manager{
+		Cache:  autocert.DirCache("cache-dir"),
+		Prompt: autocert.AcceptTOS,
+	}
+	server := &http.Server{
+		Addr:      addr,
+		Handler:   handler,
+		TLSConfig: manager.TLSConfig(),
+	}
+	return server.ListenAndServeTLS("", "")
 }
 
 func runMigrations(dsn string) error {
