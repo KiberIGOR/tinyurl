@@ -4,6 +4,7 @@ package config
 import (
 	"flag"
 	"os"
+	"strconv"
 )
 
 // Config — параметры запуска HTTP-сервера и хранилища.
@@ -16,6 +17,8 @@ type Config struct {
 	SecretKey       string
 	AuditFile       string
 	AuditURL        string
+	// EnableHTTPS включает TLS (флаг -s, env ENABLE_HTTPS).
+	EnableHTTPS bool
 }
 
 // Parse читает флаги командной строки и переопределяет их значениями из env.
@@ -30,6 +33,7 @@ func Parse() *Config {
 	flag.StringVar(&cfg.SecretKey, "k", "J83YbUemqzZBG1iJoNz8", "Secret Key for JWT")
 	flag.StringVar(&cfg.AuditFile, "audit-file", "", "path to audit log file")
 	flag.StringVar(&cfg.AuditURL, "audit-url", "", "URL of remote audit receiver")
+	flag.BoolVar(&cfg.EnableHTTPS, "s", false, "enable HTTPS")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("SERVER_ADDRESS"); envRunAddr != "" {
@@ -54,6 +58,12 @@ func Parse() *Config {
 
 	if envRunAddr := os.Getenv("AUDIT_URL"); envRunAddr != "" {
 		cfg.AuditURL = envRunAddr
+	}
+
+	if envHTTPS := os.Getenv("ENABLE_HTTPS"); envHTTPS != "" {
+		if v, err := strconv.ParseBool(envHTTPS); err == nil {
+			cfg.EnableHTTPS = v
+		}
 	}
 
 	return cfg
