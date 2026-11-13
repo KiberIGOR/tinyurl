@@ -79,7 +79,8 @@ func TestGetUrlHandler(t *testing.T) {
 			require.NoError(t, err)
 			defer store.Close()
 			if test.want.code == http.StatusTemporaryRedirect {
-				if _, err := store.Get(context.Background(), test.path); errors.Is(err, repository.ErrNotFound) {
+				_, err = store.Get(context.Background(), test.path)
+				if errors.Is(err, repository.ErrNotFound) {
 					_, err = store.Save(context.Background(), test.path, test.want.location, randomUserID(t))
 					require.NoError(t, err)
 				}
@@ -467,7 +468,8 @@ func TestGetUsersURLs(t *testing.T) {
 			require.NoError(t, err)
 			defer store.Close()
 			if test.want.code == http.StatusOK {
-				if _, err := store.Get(context.Background(), test.want.responseShort); errors.Is(err, repository.ErrNotFound) {
+				_, err = store.Get(context.Background(), test.want.responseShort)
+				if errors.Is(err, repository.ErrNotFound) {
 					_, err = store.Save(context.Background(), test.want.responseShort, test.want.responseOriginal, userID)
 					require.NoError(t, err)
 				}

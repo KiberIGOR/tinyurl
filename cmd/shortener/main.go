@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -26,6 +27,19 @@ import (
 	// _ "net/http/pprof" // подключаем пакет pprof
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
+func buildLabel(value string) string {
+	if value == "" {
+		return "N/A"
+	}
+	return value
+}
+
 // stub
 type nilPinger struct{}
 
@@ -34,6 +48,10 @@ func (nilPinger) Ping(ctx context.Context) error {
 }
 
 func main() {
+	fmt.Println("Build version:", buildLabel(buildVersion))
+	fmt.Println("Build date:", buildLabel(buildDate))
+	fmt.Println("Build commit:", buildLabel(buildCommit))
+
 	cfg := config.Parse()
 
 	if err := logger.Initialize("info"); err != nil {
@@ -80,7 +98,8 @@ func main() {
 
 	auditBroker := audit.NewBroker()
 	if cfg.AuditFile != "" {
-		fileObserver, err := audit.NewFileObserver(cfg.AuditFile)
+		var fileObserver *audit.FileObserver
+		fileObserver, err = audit.NewFileObserver(cfg.AuditFile)
 		if err != nil {
 			log.Fatal("audit file: ", err)
 		}
