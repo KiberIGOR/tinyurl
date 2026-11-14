@@ -53,7 +53,10 @@ func main() {
 	fmt.Println("Build date:", buildLabel(buildDate))
 	fmt.Println("Build commit:", buildLabel(buildCommit))
 
-	cfg := config.Parse()
+	cfg, err := config.Parse()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if err := logger.Initialize("info"); err != nil {
 		log.Fatal(err)
@@ -61,7 +64,6 @@ func main() {
 	var store service.URLRepository
 	var userRepo service.UserRepository
 	var pinger handler.Pinger
-	var err error
 	switch {
 	case cfg.DataBaseDSN != "":
 		initCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
