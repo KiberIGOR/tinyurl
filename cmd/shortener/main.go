@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"log"
@@ -64,6 +67,7 @@ func main() {
 	var store service.URLRepository
 	var userRepo service.UserRepository
 	var pinger handler.Pinger
+	var fileStore *repository.FileMemory
 	switch {
 	case cfg.DataBaseDSN != "":
 		initCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -82,12 +86,10 @@ func main() {
 		userRepo = pg
 		pinger = pg
 	case cfg.FileStoragePath != "":
-		var fileStore *repository.FileMemory
 		fileStore, err = repository.NewFile(cfg.FileStoragePath)
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer fileStore.Close()
 		store = fileStore
 		userRepo = fileStore
 		pinger = nilPinger{}
@@ -100,13 +102,13 @@ func main() {
 	svc := service.NewShortener(store, cfg.BaseURL)
 
 	auditBroker := audit.NewBroker()
+	var auditFile *audit.FileObserver
 	if cfg.AuditFile != "" {
-		var fileObserver *audit.FileObserver
-		fileObserver, err = audit.NewFileObserver(cfg.AuditFile)
+		auditFile, err = audit.NewFileObserver(cfg.AuditFile)
 		if err != nil {
 			log.Fatal("audit file: ", err)
 		}
-		auditBroker.Subscribe(fileObserver)
+		auditBroker.Subscribe(auditFile)
 	}
 	if cfg.AuditURL != "" {
 		auditBroker.Subscribe(audit.NewHTTPObserver(cfg.AuditURL, nil))
@@ -138,27 +140,57 @@ func main() {
 	// 	}
 	// }()
 
-	err = runServer(cfg.Address, r, cfg.EnableHTTPS)
-	if err != nil {
-		log.Fatal(err)
+	srv := newHTTPServer(cfg.Address, r, cfg.EnableHTTPS)
+
+	go func() {
+		var listenErr error
+		if cfg.EnableHTTPS {
+			listenErr = srv.ListenAndServeTLS("", "")
+		} else {
+			listenErr = srv.ListenAndServe()
+		}
+		if listenErr != nil && !errors.Is(listenErr, http.ErrServerClosed) {
+			log.Fatal(listenErr)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	<-quit
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err = srv.Shutdown(shutdownCtx); err != nil {
+		log.Fatal("server shutdown: ", err)
+	}
+
+	h.Wait()
+
+	if auditFile != nil {
+		if err = auditFile.Close(); err != nil {
+			log.Print("audit file close: ", err)
+		}
+	}
+	if fileStore != nil {
+		if err = fileStore.Close(); err != nil {
+			log.Fatal("file storage close: ", err)
+		}
 	}
 }
 
-func runServer(addr string, handler http.Handler, enableHTTPS bool) error {
+func newHTTPServer(addr string, handler http.Handler, enableHTTPS bool) *http.Server {
 	if !enableHTTPS {
-		return http.ListenAndServe(addr, handler)
+		return &http.Server{Addr: addr, Handler: handler}
 	}
-
 	manager := &autocert.Manager{
 		Cache:  autocert.DirCache("cache-dir"),
 		Prompt: autocert.AcceptTOS,
 	}
-	server := &http.Server{
+	return &http.Server{
 		Addr:      addr,
 		Handler:   handler,
 		TLSConfig: manager.TLSConfig(),
 	}
-	return server.ListenAndServeTLS("", "")
 }
 
 func runMigrations(dsn string) error {

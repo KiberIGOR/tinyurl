@@ -160,7 +160,11 @@ func (m *FileMemory) Close() error {
 	if m.file == nil {
 		return nil
 	}
-	err := m.file.Close()
+	err := m.file.Sync()
+	if err != nil {
+		return err
+	}
+	err = m.file.Close()
 	m.file = nil
 	m.enc = nil
 	return err

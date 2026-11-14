@@ -1,0 +1,4 @@
+{"uuid":"1","short_url":"EwHXdJfB","original_url":"https://practicum.yandex.ru/","user_id":"728192"}
+{"uuid":"2","short_url":"vlsWCZhi","original_url":"https://practicum.yandex.ru/","user_id":"743334"}
+{"uuid":"3","short_url":"16sZvohc","original_url":"https://practicum.yandex.ru","user_id":"974262"}
+{"uuid":"4","short_url":"EwHXdJfT","original_url":"https://practicum.yandex.ru","user_id":"1"}

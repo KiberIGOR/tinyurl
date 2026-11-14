@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/KiberIGOR/tinyurl/internal/audit"
@@ -47,6 +48,7 @@ type Handler struct {
 	shortener Shortener
 	pinger    Pinger
 	audit     *audit.Broker
+	bg        sync.WaitGroup
 }
 
 // New создаёт Handler. auditBroker может быть nil — аудит отключён.
@@ -301,7 +303,16 @@ func (h *Handler) DeleteUsersURLs(res http.ResponseWriter, req *http.Request) {
 		shortURLCh <- string(item)
 	}
 	close(shortURLCh)
-	go h.shortener.DeleteByUserID(context.Background(), userID, shortURLCh)
+	h.bg.Add(1)
+	go func() {
+		defer h.bg.Done()
+		h.shortener.DeleteByUserID(context.Background(), userID, shortURLCh)
+	}()
 
 	res.WriteHeader(http.StatusAccepted)
+}
+
+// Wait блокируется, пока не завершатся фоновые задачи (например, асинхронное удаление).
+func (h *Handler) Wait() {
+	h.bg.Wait()
 }
