@@ -69,9 +69,9 @@ func parseConfig(args []string) (*Config, error) {
 
 func defaultConfig() *Config {
 	return &Config{
-		Address:     ":8080",
-		BaseURL:     "http://localhost:8080/",
-		SecretKey:   "J83YbUemqzZBG1iJoNz8",
+		Address:   ":8080",
+		BaseURL:   "http://localhost:8080/",
+		SecretKey: "J83YbUemqzZBG1iJoNz8",
 		// FileStoragePath: "fileMemory.txt",
 		// DataBaseDSN: "postgres://urls:urls@localhost:5432/urls?sslmode=disable",
 	}
