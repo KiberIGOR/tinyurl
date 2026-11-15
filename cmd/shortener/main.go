@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -27,6 +28,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/acme/autocert"
 	// _ "net/http/pprof" // подключаем пакет pprof
 )
@@ -140,7 +142,10 @@ func main() {
 	// 	}
 	// }()
 
-	srv := newHTTPServer(cfg.Address, r, cfg.EnableHTTPS)
+	srv, err := newHTTPServer(cfg, r)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	go func() {
 		var listenErr error
@@ -161,36 +166,55 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err = srv.Shutdown(shutdownCtx); err != nil {
-		log.Fatal("server shutdown: ", err)
+		logger.Log.Error("server shutdown", zap.Error(err))
 	}
 
 	h.Wait()
 
 	if auditFile != nil {
 		if err = auditFile.Close(); err != nil {
-			log.Print("audit file close: ", err)
+			logger.Log.Error("audit file close", zap.Error(err))
 		}
 	}
 	if fileStore != nil {
 		if err = fileStore.Close(); err != nil {
-			log.Fatal("file storage close: ", err)
+			logger.Log.Error("file storage close", zap.Error(err))
 		}
 	}
 }
 
-func newHTTPServer(addr string, handler http.Handler, enableHTTPS bool) *http.Server {
-	if !enableHTTPS {
-		return &http.Server{Addr: addr, Handler: handler}
+func newHTTPServer(cfg *config.Config, handler http.Handler) (*http.Server, error) {
+	if !cfg.EnableHTTPS {
+		return &http.Server{Addr: cfg.Address, Handler: handler}, nil
 	}
+
+	host, err := tlsHostFromBaseURL(cfg.BaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("https: %w", err)
+	}
+
 	manager := &autocert.Manager{
-		Cache:  autocert.DirCache("cache-dir"),
-		Prompt: autocert.AcceptTOS,
+		Cache:      autocert.DirCache("cache-dir"),
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist(host),
 	}
 	return &http.Server{
-		Addr:      addr,
+		Addr:      cfg.Address,
 		Handler:   handler,
 		TLSConfig: manager.TLSConfig(),
+	}, nil
+}
+
+func tlsHostFromBaseURL(baseURL string) (string, error) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("parse base_url: %w", err)
 	}
+	host := u.Hostname()
+	if host == "" {
+		return "", errors.New("base_url must contain a host for HTTPS")
+	}
+	return host, nil
 }
 
 func runMigrations(dsn string) error {
