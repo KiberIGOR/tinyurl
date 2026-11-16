@@ -41,6 +41,6 @@ type UserResponse struct {
 type DeleteRequest string
 
 type StatusResponse struct {
-	Urls int64 `json:"urls"`
+	Urls  int64 `json:"urls"`
 	Users int64 `json:"users"`
 }

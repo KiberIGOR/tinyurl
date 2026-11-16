@@ -313,7 +313,6 @@ func (h *Handler) DeleteUsersURLs(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusAccepted)
 }
 
-
 // GetStatus обрабатывает GET /api/internal/stats: число URL и пользователей (JSON).
 func (h *Handler) GetStatus(res http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
@@ -335,6 +334,7 @@ func (h *Handler) GetStatus(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }
+
 // Wait блокируется, пока не завершатся фоновые задачи (например, асинхронное удаление).
 func (h *Handler) Wait() {
 	h.bg.Wait()

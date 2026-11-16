@@ -138,7 +138,7 @@ func main() {
 	})
 	r.With(auth.AuthMiddleware).Get("/api/user/urls", h.GetUsersURLs)
 	r.With(auth.AuthMiddleware).Delete("/api/user/urls", h.DeleteUsersURLs)
-	r.With(ip.IPMiddleware).Get("/api/internal/stats",h.GetStatus)
+	r.With(ip.IPMiddleware).Get("/api/internal/stats", h.GetStatus)
 
 	// go func() {
 	// 	log.Println("pprof listening on :6060")
