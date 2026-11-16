@@ -167,3 +167,21 @@ func (m *Memory) findByOriginal(originalURL string) (string, bool) {
 	}
 	return "", false
 }
+
+func (m *Memory) CountURLs(ctx context.Context) (int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var n int64
+	for short := range m.byShort {
+		if !m.isDeleted(short) {
+			n++
+		}
+	}
+	return n, nil
+}
+
+func (m *Memory) CountUsers(ctx context.Context) (int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return int64(m.lastUserID), nil
+}

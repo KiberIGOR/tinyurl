@@ -157,3 +157,25 @@ func (d *DB) GetLastID(ctx context.Context) int {
 	}
 	return id
 }
+
+func (d *DB) CountURLs(ctx context.Context) (int64, error) {
+	var n int64
+	err := d.db.QueryRow(ctx, `SELECT COUNT(*) FROM urls WHERE deleted_flag IS NOT TRUE`).Scan(&n)
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
+func (d *DB) CountUsers(ctx context.Context) (int64, error) {
+	var n int64
+	err := d.db.QueryRow(ctx, `
+		SELECT GREATEST(
+			COALESCE((SELECT MAX(user_id) FROM urls), 0),
+			COALESCE((SELECT last_value::bigint FROM user_id_seq), 0)
+		)`).Scan(&n)
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
+}
