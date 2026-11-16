@@ -50,3 +50,18 @@ func (o *FileObserver) Notify(ctx context.Context, event Event) {
 		logger.Log.Error("audit file: write", zap.Error(err), zap.String("path", o.path))
 	}
 }
+
+// Close сбрасывает буферы и закрывает файл аудита.
+func (o *FileObserver) Close() error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.file == nil {
+		return nil
+	}
+	if err := o.file.Sync(); err != nil {
+		return err
+	}
+	err := o.file.Close()
+	o.file = nil
+	return err
+}

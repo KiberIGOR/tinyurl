@@ -5,6 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"log"
@@ -24,6 +28,8 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"go.uber.org/zap"
+	"golang.org/x/crypto/acme/autocert"
 	// _ "net/http/pprof" // подключаем пакет pprof
 )
 
@@ -52,7 +58,10 @@ func main() {
 	fmt.Println("Build date:", buildLabel(buildDate))
 	fmt.Println("Build commit:", buildLabel(buildCommit))
 
-	cfg := config.Parse()
+	cfg, err := config.Parse()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if err := logger.Initialize("info"); err != nil {
 		log.Fatal(err)
@@ -60,7 +69,7 @@ func main() {
 	var store service.URLRepository
 	var userRepo service.UserRepository
 	var pinger handler.Pinger
-	var err error
+	var fileStore *repository.FileMemory
 	switch {
 	case cfg.DataBaseDSN != "":
 		initCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -79,12 +88,10 @@ func main() {
 		userRepo = pg
 		pinger = pg
 	case cfg.FileStoragePath != "":
-		var fileStore *repository.FileMemory
 		fileStore, err = repository.NewFile(cfg.FileStoragePath)
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer fileStore.Close()
 		store = fileStore
 		userRepo = fileStore
 		pinger = nilPinger{}
@@ -97,13 +104,13 @@ func main() {
 	svc := service.NewShortener(store, cfg.BaseURL)
 
 	auditBroker := audit.NewBroker()
+	var auditFile *audit.FileObserver
 	if cfg.AuditFile != "" {
-		var fileObserver *audit.FileObserver
-		fileObserver, err = audit.NewFileObserver(cfg.AuditFile)
+		auditFile, err = audit.NewFileObserver(cfg.AuditFile)
 		if err != nil {
 			log.Fatal("audit file: ", err)
 		}
-		auditBroker.Subscribe(fileObserver)
+		auditBroker.Subscribe(auditFile)
 	}
 	if cfg.AuditURL != "" {
 		auditBroker.Subscribe(audit.NewHTTPObserver(cfg.AuditURL, nil))
@@ -135,10 +142,79 @@ func main() {
 	// 	}
 	// }()
 
-	err = http.ListenAndServe(cfg.Address, r)
+	srv, err := newHTTPServer(cfg, r)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	go func() {
+		var listenErr error
+		if cfg.EnableHTTPS {
+			listenErr = srv.ListenAndServeTLS("", "")
+		} else {
+			listenErr = srv.ListenAndServe()
+		}
+		if listenErr != nil && !errors.Is(listenErr, http.ErrServerClosed) {
+			log.Fatal(listenErr)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	<-quit
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err = srv.Shutdown(shutdownCtx); err != nil {
+		logger.Log.Error("server shutdown", zap.Error(err))
+	}
+
+	h.Wait()
+
+	if auditFile != nil {
+		if err = auditFile.Close(); err != nil {
+			logger.Log.Error("audit file close", zap.Error(err))
+		}
+	}
+	if fileStore != nil {
+		if err = fileStore.Close(); err != nil {
+			logger.Log.Error("file storage close", zap.Error(err))
+		}
+	}
+}
+
+func newHTTPServer(cfg *config.Config, handler http.Handler) (*http.Server, error) {
+	if !cfg.EnableHTTPS {
+		return &http.Server{Addr: cfg.Address, Handler: handler}, nil
+	}
+
+	host, err := tlsHostFromBaseURL(cfg.BaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("https: %w", err)
+	}
+
+	manager := &autocert.Manager{
+		Cache:      autocert.DirCache("cache-dir"),
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist(host),
+	}
+	return &http.Server{
+		Addr:      cfg.Address,
+		Handler:   handler,
+		TLSConfig: manager.TLSConfig(),
+	}, nil
+}
+
+func tlsHostFromBaseURL(baseURL string) (string, error) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("parse base_url: %w", err)
+	}
+	host := u.Hostname()
+	if host == "" {
+		return "", errors.New("base_url must contain a host for HTTPS")
+	}
+	return host, nil
 }
 
 func runMigrations(dsn string) error {
