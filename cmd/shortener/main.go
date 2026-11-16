@@ -18,6 +18,7 @@ import (
 	"github.com/KiberIGOR/tinyurl/internal/compress"
 	"github.com/KiberIGOR/tinyurl/internal/config"
 	"github.com/KiberIGOR/tinyurl/internal/handler"
+	"github.com/KiberIGOR/tinyurl/internal/ip"
 	"github.com/KiberIGOR/tinyurl/internal/logger"
 	"github.com/KiberIGOR/tinyurl/internal/repository"
 	"github.com/KiberIGOR/tinyurl/internal/service"
@@ -119,6 +120,9 @@ func main() {
 	h := handler.New(svc, pinger, auditBroker)
 
 	auth.Initialize(service.NewAuthService(userRepo, cfg.SecretKey))
+	if err = ip.Initialize(cfg.TrustedSubnet); err != nil {
+		log.Fatal(err)
+	}
 
 	r := chi.NewRouter()
 	r.Use(logger.RequestLogger)
@@ -134,6 +138,7 @@ func main() {
 	})
 	r.With(auth.AuthMiddleware).Get("/api/user/urls", h.GetUsersURLs)
 	r.With(auth.AuthMiddleware).Delete("/api/user/urls", h.DeleteUsersURLs)
+	r.With(ip.IPMiddleware).Get("/api/internal/stats", h.GetStatus)
 
 	// go func() {
 	// 	log.Println("pprof listening on :6060")

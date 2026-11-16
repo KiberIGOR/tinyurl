@@ -36,6 +36,7 @@ type Shortener interface {
 	BatchShorten(ctx context.Context, batch []model.BatchRequest, userID int) ([]model.BatchResponse, error)
 	ResolveByUserID(ctx context.Context, userID int) ([]model.UserResponse, error)
 	DeleteByUserID(ctx context.Context, userID int, shortURLCh chan string)
+	GetUsersAndUrls(ctx context.Context) (model.StatusResponse, error)
 }
 
 // Pinger проверяет доступность бэкенда (например, PostgreSQL).
@@ -310,6 +311,28 @@ func (h *Handler) DeleteUsersURLs(res http.ResponseWriter, req *http.Request) {
 	}()
 
 	res.WriteHeader(http.StatusAccepted)
+}
+
+// GetStatus обрабатывает GET /api/internal/stats: число URL и пользователей (JSON).
+func (h *Handler) GetStatus(res http.ResponseWriter, req *http.Request) {
+	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
+	defer cancel()
+	status, err := h.shortener.GetUsersAndUrls(ctx)
+	if err != nil {
+		respondInternalError(res, err)
+		return
+	}
+	out, err := json.Marshal(status)
+	if err != nil {
+		respondInternalError(res, err)
+		return
+	}
+	res.Header().Set("content-type", "application/json")
+	res.Header().Set("content-length", strconv.Itoa(len(out)))
+	res.WriteHeader(http.StatusOK)
+	if _, err = res.Write(out); err != nil {
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}
 }
 
 // Wait блокируется, пока не завершатся фоновые задачи (например, асинхронное удаление).

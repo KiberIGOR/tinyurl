@@ -21,7 +21,8 @@ type Config struct {
 	AuditFile       string
 	AuditURL        string
 	// EnableHTTPS включает TLS (флаг -s, env ENABLE_HTTPS).
-	EnableHTTPS bool
+	EnableHTTPS   bool
+	TrustedSubnet string
 }
 
 type fileConfig struct {
@@ -33,6 +34,7 @@ type fileConfig struct {
 	AuditFile       *string `json:"audit_file"`
 	AuditURL        *string `json:"audit_url"`
 	EnableHTTPS     *bool   `json:"enable_https"`
+	TrustedSubnet   *string `json:"trusted_subnet"`
 }
 
 // Parse читает конфигурацию: значения по умолчанию, JSON-файл, флаги, переменные окружения.
@@ -89,6 +91,7 @@ func bindFlags(fs *flag.FlagSet, cfg *Config, configPath string) {
 	fs.StringVar(&cfg.AuditFile, "audit-file", cfg.AuditFile, "path to audit log file")
 	fs.StringVar(&cfg.AuditURL, "audit-url", cfg.AuditURL, "URL of remote audit receiver")
 	fs.BoolVar(&cfg.EnableHTTPS, "s", cfg.EnableHTTPS, "enable HTTPS")
+	fs.StringVar(&cfg.TrustedSubnet, "t", cfg.TrustedSubnet, "Trusted Subnet(CIDR) for metod GET api/internal/status")
 }
 
 func configPathFromEnvAndArgs(args []string) string {
@@ -150,6 +153,9 @@ func mergeFileConfig(cfg *Config, fc *fileConfig) {
 	if fc.EnableHTTPS != nil {
 		cfg.EnableHTTPS = *fc.EnableHTTPS
 	}
+	if fc.TrustedSubnet != nil {
+		cfg.TrustedSubnet = *fc.TrustedSubnet
+	}
 }
 
 func applyEnv(cfg *Config) {
@@ -175,5 +181,8 @@ func applyEnv(cfg *Config) {
 		if b, err := strconv.ParseBool(v); err == nil {
 			cfg.EnableHTTPS = b
 		}
+	}
+	if v := os.Getenv("TRUSTED_SUBNET"); v != "" {
+		cfg.TrustedSubnet = v
 	}
 }
