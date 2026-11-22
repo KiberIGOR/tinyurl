@@ -86,7 +86,7 @@ func TestGetUrlHandler(t *testing.T) {
 					require.NoError(t, err)
 				}
 			}
-			h := New(service.NewShortener(store, "http://localhost:8080/"), m, nil)
+			h := NewForTest(service.NewShortener(store, "http://localhost:8080/"), m, nil)
 
 			request := httptest.NewRequest(test.method, "/"+test.path, nil)
 			request.SetPathValue("id", test.path)
@@ -169,7 +169,7 @@ func TestPostUrlHandler(t *testing.T) {
 			store, err := repository.NewFile("fileMemoryTest.txt")
 			require.NoError(t, err)
 			defer store.Close()
-			h := New(service.NewShortener(store, redirect), m, nil)
+			h := NewForTest(service.NewShortener(store, redirect), m, nil)
 			h.PostURLHandler(w, request)
 
 			res := w.Result()
@@ -270,7 +270,7 @@ func TestPostJsonUrlHandler(t *testing.T) {
 			store, err := repository.NewFile("fileMemoryTest.txt")
 			require.NoError(t, err)
 			defer store.Close()
-			h := New(service.NewShortener(store, redirect), m, nil)
+			h := NewForTest(service.NewShortener(store, redirect), m, nil)
 			h.PostJSONURLHandler(w, request)
 
 			res := w.Result()
@@ -374,7 +374,7 @@ func TestPostBatchHandler(t *testing.T) {
 			store, err := repository.NewFile("fileMemoryTest.txt")
 			require.NoError(t, err)
 			defer store.Close()
-			h := New(service.NewShortener(store, redirect), m, nil)
+			h := NewForTest(service.NewShortener(store, redirect), m, nil)
 			h.PostBatchHandler(w, request)
 
 			res := w.Result()
@@ -475,7 +475,7 @@ func TestGetUsersURLs(t *testing.T) {
 					require.NoError(t, err)
 				}
 			}
-			h := New(service.NewShortener(store, redirect), m, nil)
+			h := NewForTest(service.NewShortener(store, redirect), m, nil)
 			h.GetUsersURLs(w, request)
 
 			res := w.Result()
@@ -556,7 +556,7 @@ func TestDeleteUsersURLs(t *testing.T) {
 				_, err := store.Save(context.Background(), test.want.responseShort, test.want.responseOriginal, userID)
 				require.NoError(t, err)
 			}
-			h := New(service.NewShortener(store, redirect), m, nil)
+			h := NewForTest(service.NewShortener(store, redirect), m, nil)
 			h.DeleteUsersURLs(w, request)
 
 			res := w.Result()
@@ -605,7 +605,7 @@ func TestGetStatusHandler(t *testing.T) {
 	defer ctrl.Finish()
 	m := mocks.NewMockPinger(ctrl)
 	svc := service.NewShortener(mem, "http://localhost/")
-	h := New(svc, m, nil)
+	h := NewForTest(svc, m, nil)
 	handler := ip.IPMiddleware(http.HandlerFunc(h.GetStatus))
 
 	t.Run("forbidden without header", func(t *testing.T) {
@@ -645,7 +645,7 @@ func TestGetStatusHandlerEmptySubnet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	m := mocks.NewMockPinger(ctrl)
-	h := New(service.NewShortener(mem, "http://localhost/"), m, nil)
+	h := NewForTest(service.NewShortener(mem, "http://localhost/"), m, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/internal/stats", nil)
 	req.Header.Set("X-Real-IP", "127.0.0.1")

@@ -13,6 +13,7 @@ import (
 
 	"github.com/KiberIGOR/tinyurl/internal/audit"
 	"github.com/KiberIGOR/tinyurl/internal/auth"
+	"github.com/KiberIGOR/tinyurl/internal/facade"
 	"github.com/KiberIGOR/tinyurl/internal/logger"
 	"github.com/KiberIGOR/tinyurl/internal/model"
 	"github.com/KiberIGOR/tinyurl/internal/service"
@@ -46,6 +47,7 @@ type Pinger interface {
 
 // Handler обрабатывает HTTP-запросы к API сокращателя.
 type Handler struct {
+	facade    *facade.Shortener
 	shortener Shortener
 	pinger    Pinger
 	audit     *audit.Broker
@@ -53,8 +55,8 @@ type Handler struct {
 }
 
 // New создаёт Handler. auditBroker может быть nil — аудит отключён.
-func New(shortener Shortener, pinger Pinger, auditBroker *audit.Broker) *Handler {
-	return &Handler{shortener: shortener, pinger: pinger, audit: auditBroker}
+func New(api *facade.Shortener, shortener Shortener, pinger Pinger, auditBroker *audit.Broker) *Handler {
+	return &Handler{facade: api, shortener: shortener, pinger: pinger, audit: auditBroker}
 }
 
 func userIDFromContext(ctx context.Context) int {
@@ -74,7 +76,8 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithTimeout(req.Context(), 3*time.Second)
 	defer cancel()
 	id := req.PathValue("id")
-	originalURL, err := h.shortener.Resolve(ctx, id)
+	userID := userIDFromContext(req.Context())
+	originalURL, err := h.facade.ExpandURL(ctx, userID, id)
 	if err != nil {
 		if errors.Is(err, service.ErrGone) {
 			http.Error(res, http.StatusText(http.StatusGone), http.StatusGone)
@@ -89,7 +92,6 @@ func (h *Handler) GetURL(res http.ResponseWriter, req *http.Request) {
 	}
 	res.Header().Set("Location", originalURL)
 	res.WriteHeader(http.StatusTemporaryRedirect)
-	h.publishAudit(ctx, audit.NewFollowEvent(time.Now().Unix(), userIDFromContext(req.Context()), originalURL))
 }
 
 // PostURLHandler обрабатывает POST /: тело text/plain с URL, ответ — полный short URL (201/409).
@@ -115,7 +117,7 @@ func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "URL is required", http.StatusBadRequest)
 		return
 	}
-	shortURL, err := h.shortener.Shorten(ctx, string(body), userID)
+	shortURL, err := h.facade.ShortenURL(ctx, userID, string(body))
 	status := http.StatusCreated
 	if err != nil {
 		if !errors.Is(err, service.ErrConflict) {
@@ -131,7 +133,6 @@ func (h *Handler) PostURLHandler(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	h.publishAudit(ctx, audit.NewShortenEvent(time.Now().Unix(), userID, string(body)))
 }
 
 // PostJSONURLHandler обрабатывает POST /api/shorten: JSON {"url":"..."} → {"result":"..."}.
@@ -163,7 +164,7 @@ func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request)
 		http.Error(res, "URL is required", http.StatusBadRequest)
 		return
 	}
-	shortURL, err := h.shortener.Shorten(ctx, bodyReq.URL, userID)
+	shortURL, err := h.facade.ShortenURL(ctx, userID, bodyReq.URL)
 	status := http.StatusCreated
 	if err != nil {
 		if !errors.Is(err, service.ErrConflict) {
@@ -184,7 +185,6 @@ func (h *Handler) PostJSONURLHandler(res http.ResponseWriter, req *http.Request)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	h.publishAudit(ctx, audit.NewShortenEvent(time.Now().Unix(), userID, bodyReq.URL))
 }
 
 // GetPingHandler обрабатывает GET /ping: 200, если Pinger.Ping успешен.
@@ -255,7 +255,7 @@ func (h *Handler) GetUsersURLs(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
-	urls, err := h.shortener.ResolveByUserID(ctx, userID)
+	urls, err := h.facade.ListUserURLs(ctx, userID)
 	if err != nil {
 		if errors.Is(err, service.ErrNoContent) {
 			res.WriteHeader(http.StatusNoContent)

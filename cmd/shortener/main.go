@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"errors"
+	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,6 +19,9 @@ import (
 	"github.com/KiberIGOR/tinyurl/internal/auth"
 	"github.com/KiberIGOR/tinyurl/internal/compress"
 	"github.com/KiberIGOR/tinyurl/internal/config"
+	"github.com/KiberIGOR/tinyurl/internal/facade"
+	"github.com/KiberIGOR/tinyurl/internal/grpc"
+	grpcpb "github.com/KiberIGOR/tinyurl/internal/grpc/pb"
 	"github.com/KiberIGOR/tinyurl/internal/handler"
 	"github.com/KiberIGOR/tinyurl/internal/ip"
 	"github.com/KiberIGOR/tinyurl/internal/logger"
@@ -31,6 +36,8 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/acme/autocert"
+	googlegrpc "google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	// _ "net/http/pprof" // подключаем пакет pprof
 )
 
@@ -117,7 +124,8 @@ func main() {
 		auditBroker.Subscribe(audit.NewHTTPObserver(cfg.AuditURL, nil))
 	}
 
-	h := handler.New(svc, pinger, auditBroker)
+	api := facade.NewShortener(svc, auditBroker)
+	h := handler.New(api, svc, pinger, auditBroker)
 
 	auth.Initialize(service.NewAuthService(userRepo, cfg.SecretKey))
 	if err = ip.Initialize(cfg.TrustedSubnet); err != nil {
@@ -147,10 +155,20 @@ func main() {
 	// 	}
 	// }()
 
-	srv, err := newHTTPServer(cfg, r)
+	srv, tlsCfg, err := newHTTPServer(cfg, r)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	grpcSrv, grpcLis, err := newGRPCServer(cfg, tlsCfg, api)
+	if err != nil {
+		log.Fatal(err)
+	}
+	go func() {
+		if serveErr := grpcSrv.Serve(grpcLis); serveErr != nil {
+			logger.Log.Error("grpc serve", zap.Error(serveErr))
+		}
+	}()
 
 	go func() {
 		var listenErr error
@@ -173,6 +191,7 @@ func main() {
 	if err = srv.Shutdown(shutdownCtx); err != nil {
 		logger.Log.Error("server shutdown", zap.Error(err))
 	}
+	grpcSrv.GracefulStop()
 
 	h.Wait()
 
@@ -188,14 +207,14 @@ func main() {
 	}
 }
 
-func newHTTPServer(cfg *config.Config, handler http.Handler) (*http.Server, error) {
+func newHTTPServer(cfg *config.Config, handler http.Handler) (*http.Server, *tls.Config, error) {
 	if !cfg.EnableHTTPS {
-		return &http.Server{Addr: cfg.Address, Handler: handler}, nil
+		return &http.Server{Addr: cfg.Address, Handler: handler}, nil, nil
 	}
 
 	host, err := tlsHostFromBaseURL(cfg.BaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("https: %w", err)
+		return nil, nil, fmt.Errorf("https: %w", err)
 	}
 
 	manager := &autocert.Manager{
@@ -203,11 +222,26 @@ func newHTTPServer(cfg *config.Config, handler http.Handler) (*http.Server, erro
 		Prompt:     autocert.AcceptTOS,
 		HostPolicy: autocert.HostWhitelist(host),
 	}
+	tlsCfg := manager.TLSConfig()
 	return &http.Server{
 		Addr:      cfg.Address,
 		Handler:   handler,
-		TLSConfig: manager.TLSConfig(),
-	}, nil
+		TLSConfig: tlsCfg,
+	}, tlsCfg, nil
+}
+
+func newGRPCServer(cfg *config.Config, tlsCfg *tls.Config, api *facade.Shortener) (*googlegrpc.Server, net.Listener, error) {
+	opts := []googlegrpc.ServerOption{googlegrpc.UnaryInterceptor(auth.UnaryServerInterceptor)}
+	if cfg.EnableHTTPS && tlsCfg != nil {
+		opts = append(opts, googlegrpc.Creds(credentials.NewTLS(tlsCfg)))
+	}
+	srv := googlegrpc.NewServer(opts...)
+	grpcpb.RegisterShortenerServiceServer(srv, grpc.NewShortenerServer(api))
+	lis, err := net.Listen("tcp", cfg.GRPCListenAddr())
+	if err != nil {
+		return nil, nil, err
+	}
+	return srv, lis, nil
 }
 
 func tlsHostFromBaseURL(baseURL string) (string, error) {

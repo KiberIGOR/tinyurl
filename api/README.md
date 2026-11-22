@@ -1,5 +1,13 @@
-# api
+# gRPC API
 
-В этой директории принято размещать proto-файлы или файлы в формате OpenAPI/Swagger для описания контракта сервиса.
+Proto: [proto/shortener/v1/shortener.proto](proto/shortener/v1/shortener.proto).
 
-Protocol Buffers (Protobuf) будет изучаться дальше по курсу.
+Сгенерировать Go-код:
+
+```bash
+make proto
+```
+
+gRPC слушает адрес из `GRPC_ADDRESS` / флага `-grpc` / поля `grpc_address` в JSON. Если не задан — порт HTTP + 1000 (например `:8080` → `:9080`).
+
+Авторизация: metadata `authorization` с JWT (как cookie `Token`).

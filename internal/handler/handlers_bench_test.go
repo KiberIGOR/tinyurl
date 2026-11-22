@@ -17,7 +17,7 @@ import (
 
 func BenchmarkPostURLHandler(b *testing.B) {
 	store := repository.NewMemory()
-	h := New(service.NewShortener(store, "http://localhost:8080/"), mocks.NewMockPinger(gomock.NewController(b)), nil)
+	h := NewForTest(service.NewShortener(store, "http://localhost:8080/"), mocks.NewMockPinger(gomock.NewController(b)), nil)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -41,7 +41,7 @@ func BenchmarkGetURLHandler(b *testing.B) {
 	if _, err := store.Save(ctx, short, "https://practicum.yandex.ru/", 1); err != nil {
 		b.Fatal(err)
 	}
-	h := New(service.NewShortener(store, "http://localhost:8080/"), mocks.NewMockPinger(gomock.NewController(b)), nil)
+	h := NewForTest(service.NewShortener(store, "http://localhost:8080/"), mocks.NewMockPinger(gomock.NewController(b)), nil)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
