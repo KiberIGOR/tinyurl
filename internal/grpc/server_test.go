@@ -36,7 +36,10 @@ func TestGRPCShortenAndExpand(t *testing.T) {
 	go srv.Serve(lis)
 	t.Cleanup(func() { srv.GracefulStop() })
 
-	conn, err := googlegrpc.Dial(lis.Addr().String(), googlegrpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := googlegrpc.NewClient(
+		lis.Addr().String(),
+		googlegrpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
 	client := pb.NewShortenerServiceClient(conn)
