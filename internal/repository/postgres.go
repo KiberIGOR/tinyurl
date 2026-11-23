@@ -159,9 +159,9 @@ func (d *DB) GetLastID(ctx context.Context) int {
 }
 
 func (d *DB) CountUsersAndURLs(ctx context.Context) (int64, int64, error) {
-    var urls, users int64
+	var urls, users int64
 
-    err := d.db.QueryRow(ctx, `
+	err := d.db.QueryRow(ctx, `
         SELECT
             (SELECT COUNT(*)
              FROM urls
@@ -179,9 +179,9 @@ func (d *DB) CountUsersAndURLs(ctx context.Context) (int64, int64, error) {
             )
     `).Scan(&urls, &users)
 
-    if err != nil {
-        return 0, 0, err
-    }
+	if err != nil {
+		return 0, 0, err
+	}
 
-    return urls, users, nil
+	return urls, users, nil
 }

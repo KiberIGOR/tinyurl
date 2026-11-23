@@ -243,13 +243,13 @@ func (s *Shortener) DeleteByUserID(ctx context.Context, userID int, shortURLCh c
 
 // GetUsersAndUrls возвращает число сокращённых URL и пользователей в хранилище.
 func (s *Shortener) GetUsersAndUrls(ctx context.Context) (model.StatusResponse, error) {
-    urls, users, err := s.repo.CountUsersAndURLs(ctx)
-    if err != nil {
-        return model.StatusResponse{}, err
-    }
+	urls, users, err := s.repo.CountUsersAndURLs(ctx)
+	if err != nil {
+		return model.StatusResponse{}, err
+	}
 
-    return model.StatusResponse{
-        Urls:  urls,
-        Users: users,
-    }, nil
+	return model.StatusResponse{
+		Urls:  urls,
+		Users: users,
+	}, nil
 }
