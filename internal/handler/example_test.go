@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/KiberIGOR/tinyurl/internal/auth"
+	"github.com/KiberIGOR/tinyurl/internal/facade"
 	"github.com/KiberIGOR/tinyurl/internal/handler"
 	"github.com/KiberIGOR/tinyurl/internal/repository"
 	"github.com/KiberIGOR/tinyurl/internal/service"
@@ -20,7 +21,7 @@ func (okPinger) Ping(context.Context) error { return nil }
 func newExampleHandler() *handler.Handler {
 	store := repository.NewMemory()
 	svc := service.NewShortener(store, "http://localhost:8080/")
-	return handler.New(svc, okPinger{}, nil)
+	return handler.New(facade.NewShortener(svc, nil), svc, okPinger{}, nil)
 }
 
 func withUserID(req *http.Request, userID int) *http.Request {
@@ -71,7 +72,8 @@ func ExampleHandler_GetURL() {
 	const shortID = "abc12345"
 	_, _ = store.Save(ctx, shortID, "https://practicum.yandex.ru/", 1)
 
-	h := handler.New(service.NewShortener(store, "http://localhost:8080/"), okPinger{}, nil)
+	svc := service.NewShortener(store, "http://localhost:8080/")
+	h := handler.New(facade.NewShortener(svc, nil), svc, okPinger{}, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/"+shortID, nil)
 	req.SetPathValue("id", shortID)
@@ -123,7 +125,8 @@ func ExampleHandler_GetUsersURLs() {
 	ctx := context.Background()
 	_, _ = store.Save(ctx, "link0001", "https://practicum.yandex.ru/", 42)
 
-	h := handler.New(service.NewShortener(store, "http://localhost:8080/"), okPinger{}, nil)
+	svc := service.NewShortener(store, "http://localhost:8080/")
+	h := handler.New(facade.NewShortener(svc, nil), svc, okPinger{}, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
 	req = withUserID(req, 42)
@@ -143,7 +146,8 @@ func ExampleHandler_DeleteUsersURLs() {
 	ctx := context.Background()
 	_, _ = store.Save(ctx, "del00001", "https://practicum.yandex.ru/", 5)
 
-	h := handler.New(service.NewShortener(store, "http://localhost:8080/"), okPinger{}, nil)
+	svc := service.NewShortener(store, "http://localhost:8080/")
+	h := handler.New(facade.NewShortener(svc, nil), svc, okPinger{}, nil)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/user/urls", strings.NewReader(`["del00001"]`))
 	req.Header.Set("content-type", "application/json")

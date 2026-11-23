@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -21,7 +22,10 @@ type Config struct {
 	AuditFile       string
 	AuditURL        string
 	// EnableHTTPS включает TLS (флаг -s, env ENABLE_HTTPS).
-	EnableHTTPS bool
+	EnableHTTPS   bool
+	TrustedSubnet string
+	// GRPCAddress — адрес gRPC (env GRPC_ADDRESS). Пустое — порт HTTP+1000.
+	GRPCAddress string
 }
 
 type fileConfig struct {
@@ -33,6 +37,8 @@ type fileConfig struct {
 	AuditFile       *string `json:"audit_file"`
 	AuditURL        *string `json:"audit_url"`
 	EnableHTTPS     *bool   `json:"enable_https"`
+	TrustedSubnet   *string `json:"trusted_subnet"`
+	GRPCAddress     *string `json:"grpc_address"`
 }
 
 // Parse читает конфигурацию: значения по умолчанию, JSON-файл, флаги, переменные окружения.
@@ -89,6 +95,8 @@ func bindFlags(fs *flag.FlagSet, cfg *Config, configPath string) {
 	fs.StringVar(&cfg.AuditFile, "audit-file", cfg.AuditFile, "path to audit log file")
 	fs.StringVar(&cfg.AuditURL, "audit-url", cfg.AuditURL, "URL of remote audit receiver")
 	fs.BoolVar(&cfg.EnableHTTPS, "s", cfg.EnableHTTPS, "enable HTTPS")
+	fs.StringVar(&cfg.TrustedSubnet, "t", cfg.TrustedSubnet, "Trusted Subnet(CIDR) for metod GET api/internal/status")
+	fs.StringVar(&cfg.GRPCAddress, "grpc", cfg.GRPCAddress, "gRPC listen address")
 }
 
 func configPathFromEnvAndArgs(args []string) string {
@@ -150,6 +158,12 @@ func mergeFileConfig(cfg *Config, fc *fileConfig) {
 	if fc.EnableHTTPS != nil {
 		cfg.EnableHTTPS = *fc.EnableHTTPS
 	}
+	if fc.TrustedSubnet != nil {
+		cfg.TrustedSubnet = *fc.TrustedSubnet
+	}
+	if fc.GRPCAddress != nil {
+		cfg.GRPCAddress = *fc.GRPCAddress
+	}
 }
 
 func applyEnv(cfg *Config) {
@@ -176,4 +190,30 @@ func applyEnv(cfg *Config) {
 			cfg.EnableHTTPS = b
 		}
 	}
+	if v := os.Getenv("TRUSTED_SUBNET"); v != "" {
+		cfg.TrustedSubnet = v
+	}
+	if v := os.Getenv("GRPC_ADDRESS"); v != "" {
+		cfg.GRPCAddress = v
+	}
+}
+
+// GRPCListenAddr возвращает адрес прослушивания gRPC (те же правила host, что и HTTP).
+func (c *Config) GRPCListenAddr() string {
+	if c.GRPCAddress != "" {
+		return c.GRPCAddress
+	}
+	return deriveGRPCAddress(c.Address)
+}
+
+func deriveGRPCAddress(httpAddr string) string {
+	host, port, err := net.SplitHostPort(httpAddr)
+	if err != nil {
+		return ":9080"
+	}
+	p, err := strconv.Atoi(port)
+	if err != nil {
+		return ":9080"
+	}
+	return net.JoinHostPort(host, strconv.Itoa(p+1000))
 }

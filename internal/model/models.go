@@ -39,3 +39,8 @@ type UserResponse struct {
 
 // DeleteRequest — элемент JSON-массива в DELETE /api/user/urls (short id).
 type DeleteRequest string
+
+type StatusResponse struct {
+	Urls  int64 `json:"urls"`
+	Users int64 `json:"users"`
+}

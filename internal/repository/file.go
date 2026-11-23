@@ -325,3 +325,15 @@ func (m *FileMemory) findByOriginal(originalURL string) (string, bool) {
 	}
 	return "", false
 }
+
+func (m *FileMemory) CountUsersAndURLs(ctx context.Context) (int64, int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var n int64
+	for short := range m.byShort {
+		if !m.isDeleted(short) {
+			n++
+		}
+	}
+	return n, int64(m.lastUserID), nil
+}

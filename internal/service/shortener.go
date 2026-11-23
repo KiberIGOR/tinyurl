@@ -38,6 +38,7 @@ type URLRepository interface {
 	BatchSave(ctx context.Context, entries []repository.URLEntry, userID int) (repository.BatchSaveResult, error)
 	GetURLsByUserID(ctx context.Context, userID int) ([]repository.URLEntry, error)
 	DeleteByShortURLs(ctx context.Context, userID int, array []string) error
+	CountUsersAndURLs(ctx context.Context) (int64, int64, error)
 }
 
 // Shortener создаёт и разрешает короткие ссылки относительно baseURL.
@@ -238,4 +239,17 @@ func (s *Shortener) DeleteByUserID(ctx context.Context, userID int, shortURLCh c
 		logger.Log.Error("delete url", zap.Error(err), zap.Int("user_id", userID))
 	}
 
+}
+
+// GetUsersAndUrls возвращает число сокращённых URL и пользователей в хранилище.
+func (s *Shortener) GetUsersAndUrls(ctx context.Context) (model.StatusResponse, error) {
+	urls, users, err := s.repo.CountUsersAndURLs(ctx)
+	if err != nil {
+		return model.StatusResponse{}, err
+	}
+
+	return model.StatusResponse{
+		Urls:  urls,
+		Users: users,
+	}, nil
 }
