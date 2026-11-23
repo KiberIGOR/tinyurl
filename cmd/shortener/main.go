@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"errors"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"

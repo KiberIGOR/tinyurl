@@ -16,6 +16,7 @@ import (
 	googlegrpc "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type memUserRepo struct {
@@ -28,11 +29,15 @@ func TestGRPCShortenAndExpand(t *testing.T) {
 
 	svc := service.NewShortener(mem, "http://localhost/")
 	fac := facade.NewShortener(svc, nil)
-	srv := googlegrpc.NewServer(googlegrpc.UnaryInterceptor(auth.UnaryServerInterceptor))
+
+	srv := googlegrpc.NewServer(
+		googlegrpc.UnaryInterceptor(auth.UnaryServerInterceptor),
+	)
 	pb.RegisterShortenerServiceServer(srv, grpcapi.NewShortenerServer(fac))
 
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
+
 	go srv.Serve(lis)
 	t.Cleanup(func() { srv.GracefulStop() })
 
@@ -42,21 +47,64 @@ func TestGRPCShortenAndExpand(t *testing.T) {
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
+
 	client := pb.NewShortenerServiceClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", ""))
-	short, err := client.ShortenURL(ctx, &pb.URLShortenRequest{Url: "https://example.com/page"})
+	// Создаём пользователя и получаем JWT.
+	ctx = metadata.NewOutgoingContext(
+		ctx,
+		metadata.Pairs("authorization", ""),
+	)
+
+	var header metadata.MD
+
+	short, err := client.ShortenURL(
+		ctx,
+		&pb.URLShortenRequest{
+			Url: "https://example.com/page",
+		},
+		googlegrpc.Header(&header),
+	)
+
 	require.NoError(t, err)
 	require.NotEmpty(t, short.GetResult())
 
-	md, _ := metadata.FromIncomingContext(ctx)
-	_ = md
-	expandCtx := metadata.NewOutgoingContext(context.Background(), metadata.Pairs())
+	tokens := header.Get("authorization")
+	require.NotEmpty(t, tokens)
+
+	token := tokens[0]
+
+	// Проверяем получение списка URL с новым JWT.
+	authCtx := metadata.NewOutgoingContext(
+		ctx,
+		metadata.Pairs("authorization", token),
+	)
+
+	urls, err := client.ListUserURLs(
+		authCtx,
+		&emptypb.Empty{},
+	)
+
+	require.NoError(t, err)
+	require.Len(t, urls.GetUrl(), 1)
+
+	require.Equal(t, short.GetResult(), urls.GetUrl()[0].GetShortUrl())
+	require.Equal(t, "https://example.com/page", urls.GetUrl()[0].GetOriginalUrl())
+
+	require.NoError(t, err)
+	require.NotEmpty(t, urls)
+
+	// Проверяем ExpandURL.
 	id := short.GetResult()[len("http://localhost/"):]
-	got, err := client.ExpandURL(expandCtx, &pb.URLExpandRequest{Id: id})
+
+	got, err := client.ExpandURL(
+		authCtx,
+		&pb.URLExpandRequest{Id: id},
+	)
+
 	require.NoError(t, err)
 	require.Equal(t, "https://example.com/page", got.GetResult())
 }

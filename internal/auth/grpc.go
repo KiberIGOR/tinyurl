@@ -83,7 +83,13 @@ func ensureUser(ctx context.Context) (context.Context, int, error) {
 	if err != nil {
 		return ctx, 0, status.Error(codes.Internal, err.Error())
 	}
-	_ = grpc.SetHeader(ctx, metadata.Pairs(metadataAuthorization, token))
+	if err := grpc.SetHeader(ctx, metadata.Pairs(metadataAuthorization, token)); err != nil {
+		return ctx, 0, status.Errorf(
+			codes.Internal,
+			"failed to set authorization header: %v",
+			err,
+		)
+	}
 	ctx = context.WithValue(ctx, KeyUserID, id)
 	return ctx, id, nil
 }
